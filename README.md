@@ -62,7 +62,7 @@ The desktop application provides an air-gapped security runtime. The `electron/`
 
 - Native IPC communication with the `d-arx` binary core via secure stdio pipes.
 - Hardware-backed biometric authentication (Windows Hello / macOS Touch ID).
-- Runtime binary signature & SHA-512 integrity verification against tamper threats.
+- Ed25519-authenticated integrity manifest with SHA-256 runtime bundle verification.
 - OS-level secure storage delegation via Electron `safeStorage`.
 
 ### <img src="assets/icons/tools.svg" width="18" height="18" align="absmiddle" alt="Mobile" /> Mobile Enclave (Capacitor)

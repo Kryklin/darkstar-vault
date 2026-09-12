@@ -60,8 +60,9 @@ export class CryptService {
     const payloadStr = new TextDecoder().decode(payload);
     const { decrypted } = await this.decrypt(payloadStr, '', keyMaterial, hwid);
     const binaryStr = atob(decrypted);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
     return bytes;
@@ -81,13 +82,17 @@ export class CryptService {
     return this.decryptBinary(payload, password);
   }
 
+  /**
+   * Encodes a binary buffer to base64 using chunked streaming buffers
+   * to avoid call-stack exhaustion and quadratic memory bloat on large files.
+   */
   private buf2base64(buffer: ArrayBuffer | Uint8Array): string {
-    let binary = '';
     const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    const CHUNK_SIZE = 0x8000; // 32KB chunk window
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      chunks.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK_SIZE))));
     }
-    return btoa(binary);
+    return btoa(chunks.join(''));
   }
 }

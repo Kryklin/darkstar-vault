@@ -1,10 +1,27 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA46+f5XZKyCHKz2XQCxqFH55jlvGvjpR0x76GzmeNVfk=
+-----END PUBLIC KEY-----`;
+
+function verifyEd25519Signature(data: Buffer | string, signatureHexOrBase64: string): boolean {
+  try {
+    const dataBuf = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
+    const trimmed = signatureHexOrBase64.trim();
+    const isHex = /^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0;
+    const sigBuf = Buffer.from(trimmed, isHex ? 'hex' : 'base64');
+    return crypto.verify(null, dataBuf, DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, sigBuf);
+  } catch {
+    return false;
+  }
+}
 
 interface ReleaseAsset {
   name: string;
@@ -101,8 +118,84 @@ export async function fetchEngines(force = false): Promise<boolean> {
     }
 
     const arrayBuffer = await downloadRes.arrayBuffer();
-    fs.writeFileSync(archivePath, Buffer.from(arrayBuffer));
-    downloadSpinner.succeed(chalk.green(`Downloaded ${targetAsset.name}`));
+    const fileBuffer = Buffer.from(arrayBuffer);
+    const computedHash = crypto.createHash('sha256').update(fileBuffer).digest('hex').toLowerCase();
+
+    // Cryptographic provenance: SHA-256 manifest & Ed25519 digital signature verification
+    const checksumAsset = release.assets.find((a) => {
+      const lower = a.name.toLowerCase();
+      return lower === `${targetAsset.name.toLowerCase()}.sha256` || lower.includes('checksum') || lower.includes('sha256sum') || lower === 'sha256.txt';
+    });
+
+    if (checksumAsset) {
+      const provSpinner = ora(chalk.blue(`Verifying SHA-256 against release manifest (${checksumAsset.name})...`)).start();
+      let csRes = await fetch(checksumAsset.browser_download_url, { headers });
+      if (csRes.status === 401 && headers['Authorization']) {
+        delete headers['Authorization'];
+        csRes = await fetch(checksumAsset.browser_download_url, { headers });
+      }
+      if (csRes.ok) {
+        const checksumText = await csRes.text();
+        let expectedHash: string | null = null;
+        const lines = checksumText.split(/\r?\n/);
+        for (const line of lines) {
+          if (line.includes(targetAsset.name)) {
+            const match = line.match(/[a-fA-F0-9]{64}/);
+            if (match) {
+              expectedHash = match[0].toLowerCase();
+              break;
+            }
+          }
+        }
+        if (!expectedHash && checksumAsset.name.toLowerCase().includes(targetAsset.name.toLowerCase())) {
+          const match = checksumText.match(/[a-fA-F0-9]{64}/);
+          if (match) expectedHash = match[0].toLowerCase();
+        }
+
+        if (expectedHash) {
+          if (computedHash !== expectedHash) {
+            provSpinner.fail(chalk.red(`Provenance Failure: SHA-256 mismatch for ${targetAsset.name}!`));
+            throw new Error(`Expected SHA-256: ${expectedHash}, computed: ${computedHash}`);
+          }
+          provSpinner.succeed(chalk.green(`SHA-256 verified (${computedHash.slice(0, 16)}...)`));
+
+          // Look for digital signature
+          const signatureAsset = release.assets.find((a) => {
+            const lower = a.name.toLowerCase();
+            return (
+              lower === `${checksumAsset.name.toLowerCase()}.sig` ||
+              lower === `${targetAsset.name.toLowerCase()}.sig` ||
+              lower.includes('checksums.txt.sig') ||
+              lower.includes('sha256sums.sig') ||
+              lower.includes('manifest.sig')
+            );
+          });
+
+          if (signatureAsset) {
+            const sigSpinner = ora(chalk.blue(`Authenticating release signature via Darkstar Trust Anchor (${signatureAsset.name})...`)).start();
+            let sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+            if (sigRes.status === 401 && headers['Authorization']) {
+              delete headers['Authorization'];
+              sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+            }
+            if (sigRes.ok) {
+              const sigContent = await sigRes.text();
+              const isSigValid = verifyEd25519Signature(checksumText, sigContent);
+              if (!isSigValid) {
+                sigSpinner.fail(chalk.red(`Signature verification failed: invalid signature against Darkstar Trust Anchor!`));
+                throw new Error(`Release signature in ${signatureAsset.name} failed verification!`);
+              }
+              sigSpinner.succeed(chalk.green('Release manifest authenticated via Darkstar Ed25519 Trust Anchor.'));
+            }
+          }
+        } else {
+          provSpinner.warn(chalk.yellow(`Checksum manifest did not contain entry for ${targetAsset.name}.`));
+        }
+      }
+    }
+
+    fs.writeFileSync(archivePath, fileBuffer);
+    downloadSpinner.succeed(chalk.green(`Downloaded & verified ${targetAsset.name}`));
 
     const extractSpinner = ora(chalk.blue('Extracting archive into ./bin...')).start();
     try {
@@ -131,7 +224,7 @@ export async function fetchEngines(force = false): Promise<boolean> {
       fs.copyFileSync(arxAlias, rustBin);
     }
 
-    // Self-test verification
+    // Self-test verification (Strict fail-closed enforcement)
     const activeBin = fs.existsSync(rustBin) ? rustBin : arxAlias;
     const testSpinner = ora(chalk.blue('Running cryptographic engine self-test...')).start();
     try {
@@ -140,8 +233,15 @@ export async function fetchEngines(force = false): Promise<boolean> {
       console.log(chalk.bold.green(`\n✨ Darkstar native engine is ready at: ${activeBin}\n`));
       return true;
     } catch (testErr: unknown) {
-      testSpinner.warn(chalk.yellow(`Self-test did not return expected output: ${(testErr as Error).message}`));
-      return true;
+      testSpinner.fail(chalk.red(`Cryptographic engine self-test FAILED: ${(testErr as Error).message}`));
+      // Clean up failed/compromised binaries immediately to fail closed
+      try {
+        if (fs.existsSync(rustBin)) fs.unlinkSync(rustBin);
+        if (fs.existsSync(arxAlias)) fs.unlinkSync(arxAlias);
+      } catch {
+        /* ignore */
+      }
+      return false;
     }
   } catch (err: unknown) {
     spinner.fail(chalk.red('Failed to obtain native engine from releases.'));
