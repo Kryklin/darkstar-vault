@@ -34,18 +34,38 @@ module.exports = {
   packagerConfig: {
     asar: true,
     icon: path.resolve(__dirname, 'public/favicon'),
+    appCopyright: 'Copyright © 2026 Darkstar. All rights reserved.',
+    appBundleId: 'com.darkstar.vault',
+    appCategoryType: 'public.app-category.utilities',
     extraResource: getExtraResources(),
+    win32metadata: {
+      CompanyName: 'Darkstar Security',
+      FileDescription: 'Darkstar Vault - Sovereign Post-Quantum Enclave',
+      OriginalFilename: 'Darkstar.exe',
+      ProductName: 'Darkstar Vault',
+      InternalName: 'darkstar-vault',
+      LegalCopyright: 'Copyright © 2026 Darkstar. All rights reserved.',
+      'requested-execution-level': 'asInvoker',
+    },
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
       config: {
+        name: 'darkstar-vault',
+        title: 'Darkstar Vault',
+        authors: 'Darkstar Security',
+        owners: 'Darkstar Security',
+        description: 'Darkstar Vault - Sovereign Post-Quantum Enclave',
+        copyright: 'Copyright © 2026 Darkstar. All rights reserved.',
         setupIcon: path.resolve(__dirname, 'public/favicon.ico'),
         loadingGif: path.resolve(__dirname, 'public/assets/img/splash_installer.gif'),
+        iconUrl: 'https://raw.githubusercontent.com/Kryklin/darkstar-vault/main/public/favicon.ico',
         createDesktopShortcut: true,
         createStartMenuShortcut: true,
         setupExe: 'Darkstar Setup.exe',
+        exe: 'Darkstar.exe',
       },
     },
     {

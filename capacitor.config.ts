@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.darkstar.app',
-  appName: 'darkstar',
+  appId: 'com.darkstar.vault',
+  appName: 'Darkstar Vault',
   webDir: 'dist/darkstar/browser',
 };
 

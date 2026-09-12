@@ -23,6 +23,10 @@ if (squirrelStartup) {
   process.exit(0);
 }
 
+// Set application identity and Windows Application User Model ID (AUMID)
+app.setName('Darkstar Vault');
+app.setAppUserModelId('com.squirrel.darkstar-vault.Darkstar');
+
 // Suppress known GPU and disk cache "Access Denied" errors on rapid restarts (especially in dev mode)
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-http-cache');
@@ -78,7 +82,7 @@ function initUpdater() {
 function createShortcut(target: 'desktop' | 'start-menu'): Promise<{ success: boolean; message: string }> {
   return new Promise((resolve) => {
     const targetPath = process.execPath;
-    const shortcutName = 'Darkstar.lnk';
+    const shortcutName = 'Darkstar Vault.lnk';
     let shortcutPath = '';
 
     if (target === 'desktop') {
@@ -90,7 +94,8 @@ function createShortcut(target: 'desktop' | 'start-menu'): Promise<{ success: bo
     const operation = shell.writeShortcutLink(shortcutPath, 'create', {
       target: targetPath,
       cwd: path.dirname(targetPath),
-      description: 'Darkstar Application',
+      description: 'Darkstar Vault - Sovereign Post-Quantum Enclave',
+      appUserModelId: 'com.squirrel.darkstar-vault.Darkstar',
     });
 
     if (operation) {
@@ -111,6 +116,7 @@ let tray: Tray | null = null;
 
 function createWindow() {
   const win = new BrowserWindow({
+    title: 'Darkstar Vault',
     width: 800,
     height: 600,
     frame: false,
@@ -154,7 +160,7 @@ function createTray() {
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon);
   const contextMenu = Menu.buildFromTemplate([{ label: `Version: ${app.getVersion()}`, enabled: false }, { type: 'separator' }, { label: 'Exit', click: () => app.quit() }]);
-  tray.setToolTip('Darkstar');
+  tray.setToolTip('Darkstar Vault');
   tray.setContextMenu(contextMenu);
   tray.on('click', () => {
     const win = BrowserWindow.getAllWindows()[0];

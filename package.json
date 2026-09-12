@@ -1,9 +1,10 @@
 {
   "name": "darkstar-vault",
   "version": "3.0.5",
-  "productName": "Darkstar",
+  "productName": "Darkstar Vault",
   "description": "Darkstar Vault - Sovereign Post-Quantum Enclave",
-  "author": "kryklin",
+  "author": "Darkstar Security",
+  "homepage": "https://github.com/Kryklin/darkstar-vault",
   "license": "CC-BY-4.0",
   "private": true,
   "main": "dist/electron/main.js",
@@ -29,6 +30,7 @@
     "audit": "npx tsx scripts/audit.ts",
     "fetch:engines": "npx tsx scripts/fetch-engines.ts",
     "rename:arx": "npx tsx scripts/replace-legacy-crypto-names.ts",
+    "generate:icons": "npx tsx scripts/generate-icons.ts",
     "splash": "npx tsx scripts/splash-maker.ts",
     "package": "electron-forge package",
     "publish": "electron-forge publish"
