@@ -26,12 +26,21 @@ filesToHash.forEach((file) => {
 // Canonical serialization for deterministic signing
 const canonicalManifest = JSON.stringify(integrity, Object.keys(integrity).sort());
 
-// Build-time signing key: from environment or official build private key
-const signingKey =
-  process.env.DARKSTAR_BUILD_PRIVATE_KEY ||
-  `-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIGNrspSRJNDkmQ5mvcwOVjKSrU5qUMVpcQGrvB7c9FKc
------END PRIVATE KEY-----`;
+// Basic .env loader to support local signed builds
+const envPath = path.join(__dirname, '..', '.env');
+if (!process.env.DARKSTAR_BUILD_PRIVATE_KEY && fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  const match = envContent.match(/DARKSTAR_BUILD_PRIVATE_KEY\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\r\n]+))/s);
+  if (match) {
+    process.env.DARKSTAR_BUILD_PRIVATE_KEY = (match[1] || match[2] || match[3] || '').trim();
+  }
+}
+
+// Build-time signing key: must be provided via environment or secure .env
+const signingKey = process.env.DARKSTAR_BUILD_PRIVATE_KEY;
+if (!signingKey) {
+  throw new Error('DARKSTAR_BUILD_PRIVATE_KEY is required for production integrity signing.');
+}
 
 const signatureHex = crypto.sign(null, Buffer.from(canonicalManifest, 'utf8'), signingKey).toString('hex');
 

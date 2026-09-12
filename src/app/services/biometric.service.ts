@@ -44,7 +44,7 @@ export class BiometricService {
       // Generate fresh 32-byte cryptographically random challenge to prevent replay attacks
       const challenge = challengeParam || window.crypto.getRandomValues(new Uint8Array(32));
 
-      const publicKey: PublicKeyCredentialRequestOptions & { credentialPublicKey?: string } = {
+      const publicKey: PublicKeyCredentialRequestOptions = {
         challenge: challenge as unknown as BufferSource,
         timeout: 60000,
         rpId: 'localhost', // Explicit RP ID for custom protocol support
@@ -75,13 +75,6 @@ export class BiometricService {
         publicKey.allowCredentials = allowScientificCredentials;
       } else {
         return false;
-      }
-
-      // Attach registered credential public key for cryptographic signature verification
-      const pubKeyStorageKey = biometricId ? 'biometric_public_key' : 'hardware_key_public_key';
-      const storedPubKey = localStorage.getItem(pubKeyStorageKey);
-      if (storedPubKey) {
-        publicKey.credentialPublicKey = storedPubKey;
       }
 
       // NATIVE PROXY: Use Electron's native handshake proxy if available to bypass scheme restrictions

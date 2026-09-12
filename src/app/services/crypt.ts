@@ -45,26 +45,42 @@ export class CryptService {
   }
 
   /**
-   * Encrypts binary data (Uint8Array) via chunked D-ARX core IPC.
-   * Splits arbitrary-length data into 16 KB chunks to prevent argument
-   * buffer overflow in the native process execution pipeline.
+   * Encrypts binary data (Uint8Array) using an authenticated streaming container.
+   * Splits data into 16 KB chunks and binds each chunk cryptographically to a unique
+   * streamId, sequential chunk index, and total chunk count to prevent chunk reordering,
+   * truncation, or splicing attacks.
    */
   async encryptBinary(data: Uint8Array, keyMaterial: string, hwid?: string): Promise<Uint8Array> {
     const CHUNK_SIZE = 16 * 1024; // 16 KB slice ceiling
     const totalSize = data.length;
+    const totalChunks = Math.ceil(totalSize / CHUNK_SIZE) || 1;
+    const streamId = Array.from(window.crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
     const chunks: string[] = [];
 
-    for (let offset = 0; offset < totalSize; offset += CHUNK_SIZE) {
+    for (let index = 0; index < totalChunks; index++) {
+      const offset = index * CHUNK_SIZE;
       const slice = data.subarray(offset, Math.min(offset + CHUNK_SIZE, totalSize));
       const sliceBase64 = this.buf2base64(slice);
-      const { encryptedData } = await this.encrypt(sliceBase64, keyMaterial, hwid);
+
+      // Authenticated frame: cryptographically binds streamId, chunk index, total chunks, and length
+      const framePayload = JSON.stringify({
+        s: streamId,
+        i: index,
+        n: totalChunks,
+        l: slice.length,
+        d: sliceBase64,
+      });
+
+      const { encryptedData } = await this.encrypt(framePayload, keyMaterial, hwid);
       chunks.push(encryptedData);
     }
 
     const container = {
-      v: 1,
-      dArxChunked: true,
+      magic: 'DARX-STRM',
+      v: 2,
+      streamId,
       totalSize,
+      totalChunks,
       chunkSize: CHUNK_SIZE,
       chunks,
     };
@@ -74,13 +90,55 @@ export class CryptService {
 
   /**
    * Decrypts binary data (Uint8Array) via the D-ARX core.
-   * Seamlessly unpacks chunked container formats while supporting legacy single-blob payloads.
+   * Authenticates streaming frames, validating streamId, chunk sequence, and bounds.
+   * Seamlessly unpacks legacy chunked (v1) and unchunked blobs for backward compatibility.
    */
   async decryptBinary(payload: Uint8Array, keyMaterial: string, hwid?: string): Promise<Uint8Array> {
     const payloadStr = new TextDecoder().decode(payload);
 
     try {
       const parsed = JSON.parse(payloadStr);
+
+      // Version 2: Authenticated Streaming Container
+      if (parsed && parsed.magic === 'DARX-STRM' && parsed.v === 2 && Array.isArray(parsed.chunks)) {
+        if (parsed.chunks.length !== parsed.totalChunks) {
+          throw new Error(`Streaming integrity violation: expected ${parsed.totalChunks} chunks, found ${parsed.chunks.length}.`);
+        }
+
+        const decryptedSlices: Uint8Array[] = [];
+        for (let idx = 0; idx < parsed.chunks.length; idx++) {
+          const chunkCiphertext = parsed.chunks[idx];
+          const { decrypted } = await this.decrypt(chunkCiphertext, '', keyMaterial, hwid);
+          const frame = JSON.parse(decrypted);
+
+          // Authenticate frame metadata
+          if (!frame || frame.s !== parsed.streamId || frame.i !== idx || frame.n !== parsed.totalChunks) {
+            throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (reordering or splicing detected).`);
+          }
+
+          const binaryStr = atob(frame.d);
+          if (typeof frame.l === 'number' && binaryStr.length !== frame.l) {
+            throw new Error(`Streaming integrity violation: chunk ${idx} length mismatch.`);
+          }
+
+          const sliceBytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            sliceBytes[i] = binaryStr.charCodeAt(i);
+          }
+          decryptedSlices.push(sliceBytes);
+        }
+
+        const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
+        const result = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const slice of decryptedSlices) {
+          result.set(slice, offset);
+          offset += slice.length;
+        }
+        return result;
+      }
+
+      // Version 1 Legacy chunked container fallback
       if (parsed && parsed.dArxChunked === true && Array.isArray(parsed.chunks)) {
         const decryptedSlices: Uint8Array[] = [];
         for (const chunk of parsed.chunks) {
@@ -102,7 +160,10 @@ export class CryptService {
         }
         return result;
       }
-    } catch {
+    } catch (parseOrIntegrityErr) {
+      if ((parseOrIntegrityErr as Error).message?.includes('Streaming integrity violation')) {
+        throw parseOrIntegrityErr;
+      }
       // Fallback to legacy single-blob decryption if payload is not a chunked JSON envelope
     }
 

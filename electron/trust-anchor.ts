@@ -7,7 +7,7 @@ import * as crypto from 'crypto';
  * 2. Native D-ARX engine release manifests downloaded from GitHub releases.
  */
 export const DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA46+f5XZKyCHKz2XQCxqFH55jlvGvjpR0x76GzmeNVfk=
+MCowBQYDK2VwAyEAprFeV34ODSQb4VtTHlbX4EYuz8gJfJLNzlnTHZCIKZo=
 -----END PUBLIC KEY-----`;
 
 /**

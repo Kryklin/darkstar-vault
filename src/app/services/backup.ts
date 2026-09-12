@@ -98,7 +98,7 @@ export class BackupService {
     return path;
   }
 
-  async validateAndRestoreBackup(): Promise<{ success: boolean; message: string }> {
+  async validateAndRestoreBackup(passwordOverride?: string): Promise<{ success: boolean; message: string }> {
     if (!window.electronAPI) return { success: false, message: 'Electron API unavailable.' };
 
     try {
@@ -128,7 +128,7 @@ export class BackupService {
       }
 
       // 4. Cryptographic trial decryption and payload validation
-      const validation = await this.vaultService.validateBackupPayload(backupData);
+      const validation = await this.vaultService.validateBackupPayload(backupData, passwordOverride);
       if (!validation.valid) {
         return { success: false, message: validation.error || 'Cryptographic authentication of backup payload failed.' };
       }

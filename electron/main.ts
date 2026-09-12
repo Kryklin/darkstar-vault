@@ -890,6 +890,30 @@ ipcMain.handle('darx-fetch-engine', async () => {
 
 // --- WebAuthn Native Proxy (Windows Hello Fix) ---
 
+interface NativeWebAuthnRecord {
+  idBase64: string;
+  publicKeyBase64: string; // DER SPKI
+  counter: number;
+  createdAt: number;
+}
+
+const getWebAuthnStoragePath = () => path.join(app.getPath('userData'), 'webauthn_registry.json');
+
+async function loadNativeWebAuthnRegistry(): Promise<Record<string, NativeWebAuthnRecord>> {
+  try {
+    const regPath = getWebAuthnStoragePath();
+    const content = await fs.readFile(regPath, 'utf8');
+    return JSON.parse(content);
+  } catch {
+    return {};
+  }
+}
+
+async function saveNativeWebAuthnRegistry(registry: Record<string, NativeWebAuthnRecord>): Promise<void> {
+  const regPath = getWebAuthnStoragePath();
+  await fs.writeFile(regPath, JSON.stringify(registry, null, 2), { encoding: 'utf8', mode: 0o600 });
+}
+
 ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action: 'create' | 'get'; publicKey: unknown }) => {
   return new Promise((resolve) => {
     let server: http.Server | null = null;
@@ -941,8 +965,7 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
             async function run() {
               try {
                 const options = ${JSON.stringify(safePublicKey)};
-                
-                // Restore ArrayBuffers for WebAuthn
+                // Reconstruct BufferSources from numeric arrays
                 if (options.challenge) options.challenge = Uint8Array.from(options.challenge).buffer;
                 if (options.user && options.user.id) options.user.id = Uint8Array.from(options.user.id).buffer;
                 if (options.allowCredentials) {
@@ -1010,9 +1033,32 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
         ipcMain.removeListener('handshake-result', resultHandler);
         cleanup();
 
-        // Native process assertion verification for 'get' action
+        // 1. Enrol credential on 'create' action in native enclave registry
+        if (options.action === 'create' && response.success && response.data) {
+          const respData = response.data as { rawId?: number[]; publicKey?: number[] };
+          if (respData.rawId && respData.publicKey) {
+            const idBase64 = Buffer.from(respData.rawId).toString('base64');
+            const pubKeyBase64 = Buffer.from(respData.publicKey).toString('base64');
+            try {
+              const registry = await loadNativeWebAuthnRegistry();
+              registry[idBase64] = {
+                idBase64,
+                publicKeyBase64: pubKeyBase64,
+                counter: 0,
+                createdAt: Date.now(),
+              };
+              await saveNativeWebAuthnRegistry(registry);
+              console.log(`[WebAuthn] Enrolled native credential record: ${idBase64.slice(0, 16)}...`);
+            } catch (saveErr) {
+              console.warn('[WebAuthn] Failed to persist native credential registry:', saveErr);
+            }
+          }
+        }
+
+        // 2. Native process assertion verification for 'get' action
         if (options.action === 'get' && response.success && response.data) {
           const respData = response.data as {
+            rawId?: number[];
             response?: {
               clientDataJSON?: number[];
               authenticatorData?: number[];
@@ -1030,11 +1076,22 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
           let clientDataJson: Record<string, unknown>;
           try {
             clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
-            if (clientDataJson.type !== 'webauthn.get') {
+            if (clientDataJson['type'] !== 'webauthn.get') {
               return resolve({ success: false, error: 'Native verification failed: assertion type mismatch.' });
             }
           } catch {
             return resolve({ success: false, error: 'Native verification failed: invalid clientDataJSON.' });
+          }
+
+          // RP ID Hash check: assert authenticator asserted for localhost
+          const expectedRpId = (options as { publicKey?: { rpId?: string } }).publicKey?.rpId || 'localhost';
+          const expectedRpIdHash = crypto.createHash('sha256').update(expectedRpId).digest();
+          const actualRpIdHash = Buffer.from(authDataArr.slice(0, 32));
+          if (!crypto.timingSafeEqual(actualRpIdHash, expectedRpIdHash)) {
+            return resolve({
+              success: false,
+              error: `Native verification failed: RP ID hash mismatch (expected '${expectedRpId}').`,
+            });
           }
 
           // Check flags at byte 32: bit 0 (UP), bit 2 (UV)
@@ -1050,10 +1107,10 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
 
           // Challenge matching
           const expectedChallenge = (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge;
-          if (expectedChallenge && clientDataJson.challenge) {
+          if (expectedChallenge && clientDataJson['challenge']) {
             const rawChal = Array.isArray(expectedChallenge) ? Buffer.from(expectedChallenge) : Buffer.from(expectedChallenge);
             const chalUrlSafe = rawChal.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            if (clientDataJson.challenge !== chalUrlSafe) {
+            if (clientDataJson['challenge'] !== chalUrlSafe) {
               return resolve({
                 success: false,
                 error: 'Native verification failed: challenge mismatch (replay defense).',
@@ -1061,34 +1118,57 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
             }
           }
 
-          // Cryptographic ECDSA P-256 signature verification if registered public key is present
-          const rawPubKey = (options as { publicKey?: { credentialPublicKey?: number[] | string } }).publicKey?.credentialPublicKey;
-          if (rawPubKey) {
-            try {
-              const pubKeyBuf = Array.isArray(rawPubKey) ? Buffer.from(rawPubKey) : Buffer.from(rawPubKey, 'base64');
-              const clientDataHash = crypto.createHash('sha256').update(Buffer.from(clientDataArr)).digest();
-              const signedData = Buffer.concat([Buffer.from(authDataArr), clientDataHash]);
+          // Native Credential Registry lookup (Renderer cannot dictate trusted public key)
+          const credentialIdBase64 = respData.rawId ? Buffer.from(respData.rawId).toString('base64') : '';
+          const registry = await loadNativeWebAuthnRegistry();
+          const nativeRecord = registry[credentialIdBase64];
 
-              const keyObject = crypto.createPublicKey({
-                key: pubKeyBuf,
-                format: 'der',
-                type: 'spki',
-              });
+          if (!nativeRecord) {
+            return resolve({
+              success: false,
+              error: 'Native verification failed: credential ID is not enrolled in the native enclave registry.',
+            });
+          }
 
-              const isSigVerified = crypto.verify('SHA256', signedData, keyObject, Buffer.from(sigArr));
-              if (!isSigVerified) {
-                return resolve({
-                  success: false,
-                  error: 'Native verification failed: authenticator signature mismatch against registered public key.',
-                });
-              }
-            } catch (verErr) {
-              console.warn('[WebAuthn] Assertion signature verification notice:', verErr);
+          // Sign Counter tracking (Cloned authenticator replay defense)
+          const signCounter = Buffer.from(authDataArr).readUInt32BE(33);
+          if (signCounter > 0 && nativeRecord.counter > 0 && signCounter <= nativeRecord.counter) {
+            return resolve({
+              success: false,
+              error: `Native verification failed: authenticator sign counter roll-back detected (${signCounter} <= ${nativeRecord.counter}). Potential cloned authenticator.`,
+            });
+          }
+          if (signCounter > nativeRecord.counter) {
+            nativeRecord.counter = signCounter;
+            await saveNativeWebAuthnRegistry(registry);
+          }
+
+          // Cryptographic ECDSA P-256 signature verification against native stored public key
+          try {
+            const pubKeyBuf = Buffer.from(nativeRecord.publicKeyBase64, 'base64');
+            const clientDataHash = crypto.createHash('sha256').update(Buffer.from(clientDataArr)).digest();
+            const signedData = Buffer.concat([Buffer.from(authDataArr), clientDataHash]);
+
+            const keyObject = crypto.createPublicKey({
+              key: pubKeyBuf,
+              format: 'der',
+              type: 'spki',
+            });
+
+            const isSigVerified = crypto.verify('SHA256', signedData, keyObject, Buffer.from(sigArr));
+            if (!isSigVerified) {
               return resolve({
                 success: false,
-                error: `Native verification failed: assertion signature check failed: ${(verErr as Error).message}`,
+                error: 'Native verification failed: authenticator signature mismatch against registered public key.',
               });
             }
+            console.log('[WebAuthn] Cryptographic assertion signature verified against native enclave registry.');
+          } catch (verErr) {
+            console.warn('[WebAuthn] Assertion signature verification notice:', verErr);
+            return resolve({
+              success: false,
+              error: `Native verification failed: assertion signature check failed: ${(verErr as Error).message}`,
+            });
           }
         }
 

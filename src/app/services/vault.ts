@@ -234,7 +234,7 @@ export class VaultService {
 
       const keyToUse = passwordOverride || this.masterKey();
       if (!keyToUse) {
-        return { valid: true };
+        return { valid: false, error: 'Cannot cryptographically authenticate backup payload without vault master key or password.' };
       }
 
       let encryptedData = envelope.data;

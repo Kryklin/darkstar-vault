@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA46+f5XZKyCHKz2XQCxqFH55jlvGvjpR0x76GzmeNVfk=
+MCowBQYDK2VwAyEAprFeV34ODSQb4VtTHlbX4EYuz8gJfJLNzlnTHZCIKZo=
 -----END PUBLIC KEY-----`;
 
 function verifyEd25519Signature(data: Buffer | string, signatureHexOrBase64: string): boolean {
