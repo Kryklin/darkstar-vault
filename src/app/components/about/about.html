@@ -76,53 +76,66 @@
     </div>
 
     <div class="flow-diagram-container">
-      <svg class="flow-svg" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
-        <!-- Connections -->
-        <path class="trace-path p1" d="M90 100 H180" />
-        <path class="trace-path p2" d="M280 100 H340" />
-        <path class="trace-path p3" d="M560 100 H630" />
-        <path class="trace-path pulse-path" d="M90 100 H180 M280 100 H340 M340 100 L370 75 L430 75 L460 100 L480 125 L530 125 L560 100 M560 100 H630" />
+      <svg class="flow-svg" viewBox="0 0 820 190" preserveAspectRatio="xMidYMid meet">
+        <!-- Connections & Laser Trace -->
+        <path class="trace-path base-track" d="M 65 95 H 745" />
+        <path class="trace-path pulse-path" d="M 65 95 H 745" />
 
-        <!-- Nodes -->
+        <!-- Node 1: Plaintext Input -->
         <g class="node n1">
-          <circle cx="90" cy="100" r="30" />
-          <text x="90" y="104" text-anchor="middle" class="node-label">INPUT</text>
+          <circle cx="65" cy="95" r="28" />
+          <text x="65" y="99" text-anchor="middle" class="node-label">INPUT</text>
         </g>
 
+        <!-- Node 2: Post-Quantum ML-KEM Seed Enclave -->
         <g class="node n2">
-          <rect x="180" y="70" width="100" height="60" rx="8" />
-          <text x="230" y="104" text-anchor="middle" class="node-label">ML-KEM</text>
+          <rect x="145" y="60" width="110" height="70" rx="12" />
+          <text x="200" y="87" text-anchor="middle" class="node-label">ML-KEM</text>
+          <text x="200" y="103" text-anchor="middle" class="node-sub">1024-BIT SEED</text>
         </g>
 
-        <!-- D-ARX SYSTEM -->
+        <!-- D-ARX-512 Permutation System -->
         <g class="cascade-system">
-          <rect x="340" y="45" width="220" height="110" rx="12" class="cascade-frame" />
-          <text x="450" y="63" text-anchor="middle" class="node-label-main">D-ARX-512 CORE</text>
+          <rect x="300" y="32" width="360" height="126" rx="14" class="cascade-frame" />
+          <text x="480" y="52" text-anchor="middle" class="node-label-main">D-ARX-512 CORE</text>
 
-          <g class="sub-node s1">
-            <circle cx="390" cy="85" r="16" />
-            <text x="390" y="89" text-anchor="middle" class="sub-label">ADD</text>
+          <!-- 16 Permutation Rounds Feedback Arc -->
+          <path class="feedback-arc" d="M 610 74 C 570 58, 390 58, 350 74" />
+          <polygon points="348,78 344,70 352,72" class="feedback-arrow" />
+          <text x="480" y="67" text-anchor="middle" class="round-label">16 PERMUTATION ROUNDS</text>
+
+          <!-- ARX Core Operations -->
+          <g class="sub-node s-ctr">
+            <circle cx="350" cy="95" r="18" />
+            <text x="350" y="99" text-anchor="middle" class="sub-label">CTR</text>
           </g>
-          <g class="sub-node p1">
-            <circle cx="445" cy="85" r="16" />
-            <text x="445" y="89" text-anchor="middle" class="sub-label">ROT</text>
+          <polygon points="389,92 395,95 389,98" class="flow-chevron" />
+
+          <g class="sub-node s-add">
+            <circle cx="435" cy="95" r="18" />
+            <text x="435" y="99" text-anchor="middle" class="sub-label">ADD</text>
           </g>
-          <g class="sub-node n1">
-            <circle cx="500" cy="85" r="16" />
-            <text x="500" y="89" text-anchor="middle" class="sub-label">XOR</text>
+          <polygon points="477,92 483,95 477,98" class="flow-chevron" />
+
+          <g class="sub-node s-rot">
+            <circle cx="525" cy="95" r="18" />
+            <text x="525" y="99" text-anchor="middle" class="sub-label">ROT</text>
           </g>
-          <g class="sub-node a1">
-            <circle cx="445" cy="122" r="16" />
-            <text x="445" y="126" text-anchor="middle" class="sub-label">CTR</text>
+          <polygon points="564,92 570,95 564,98" class="flow-chevron" />
+
+          <g class="sub-node s-xor">
+            <circle cx="610" cy="95" r="18" />
+            <text x="610" y="99" text-anchor="middle" class="sub-label">XOR</text>
           </g>
 
-          <text x="450" y="148" text-anchor="middle" class="complexity-label">[ 512-BIT CTR STREAM // 2048-BYTE EXPANSION ]</text>
-          <path class="sub-trace" d="M370 85 H425 M445 101 V106 M465 85 H480" />
+          <text x="480" y="146" text-anchor="middle" class="complexity-label">[ 512-BIT CTR STREAM // 2048-BYTE EXPANSION ]</text>
         </g>
 
+        <!-- Node 4: Ciphertext Output -->
         <g class="node n4">
-          <circle cx="670" cy="100" r="38" />
-          <text x="670" y="104" text-anchor="middle" class="node-label">OUTPUT</text>
+          <circle cx="745" cy="95" r="32" />
+          <text x="745" y="93" text-anchor="middle" class="node-label">OUTPUT</text>
+          <text x="745" y="107" text-anchor="middle" class="node-sub">CIPHERTEXT</text>
         </g>
       </svg>
 

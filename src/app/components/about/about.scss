@@ -262,16 +262,21 @@
       fill: none;
       stroke: var(--glass-border);
       stroke-width: 2;
-      opacity: 0.5;
+      opacity: 0.35;
+
+      &.base-track {
+        stroke: rgba(255, 255, 255, 0.08);
+        stroke-width: 2;
+      }
 
       &.pulse-path {
         stroke: var(--mat-sys-primary);
-        stroke-width: 4;
-        stroke-dasharray: 100, 2000;
-        stroke-dashoffset: 0;
-        animation: pulse-line 6s infinite linear;
+        stroke-width: 3.5;
+        stroke-linecap: round;
+        stroke-dasharray: 120 680;
+        animation: pulse-line 4s infinite linear;
         opacity: 1;
-        filter: drop-shadow(0 0 8px var(--glass-glow));
+        filter: drop-shadow(0 0 10px var(--glass-glow));
       }
     }
 
@@ -280,45 +285,77 @@
       rect {
         fill: var(--glass-input-bg);
         stroke: var(--glass-border);
-        stroke-width: 1;
+        stroke-width: 1.5;
         transition: all 0.5s ease;
       }
 
       .node-label {
-        font-size: 10px;
-        fill: var(--glass-text-muted);
+        font-size: 11px;
+        font-weight: 500;
+        fill: var(--glass-text);
         font-family: 'Roboto Mono', monospace;
         letter-spacing: 1px;
         pointer-events: none;
       }
 
+      .node-sub {
+        font-size: 7.5px;
+        fill: var(--glass-text-muted);
+        font-family: 'Roboto Mono', monospace;
+        letter-spacing: 0.5px;
+        opacity: 0.7;
+        pointer-events: none;
+      }
+
       &.n1 circle {
-        animation: node-glow 6s infinite;
+        animation: node-glow 4s infinite;
         animation-delay: 0s;
       }
       &.n2 rect {
-        animation: node-glow 6s infinite;
-        animation-delay: 1.2s;
+        animation: node-glow 4s infinite;
+        animation-delay: 0.8s;
       }
       &.n4 circle {
-        animation: node-glow 6s infinite;
-        animation-delay: 5.2s;
+        animation: node-glow 4s infinite;
+        animation-delay: 3.8s;
       }
     }
 
     .cascade-system {
       .cascade-frame {
-        fill: rgba(0, 0, 0, 0.15);
-        stroke: var(--glass-border);
-        stroke-dasharray: 4, 4;
-        animation: frame-rotate 10s linear infinite;
+        fill: rgba(0, 0, 0, 0.2);
+        stroke: rgba(var(--mat-sys-primary-rgb), 0.3);
+        stroke-dasharray: 6 6;
+        animation: frame-rotate 12s linear infinite;
       }
 
       .node-label-main {
         font-size: 11px;
         fill: var(--mat-sys-primary);
-        font-weight: bold;
+        font-weight: 700;
         letter-spacing: 2px;
+        font-family: 'Roboto Mono', monospace;
+      }
+
+      .feedback-arc {
+        fill: none;
+        stroke: rgba(var(--mat-sys-primary-rgb), 0.35);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 3;
+        animation: feedback-dash 1.5s linear infinite;
+      }
+
+      .feedback-arrow {
+        fill: var(--mat-sys-primary);
+        opacity: 0.8;
+      }
+
+      .round-label {
+        font-size: 7px;
+        font-family: 'Roboto Mono', monospace;
+        fill: var(--mat-sys-primary);
+        letter-spacing: 1.2px;
+        opacity: 0.85;
       }
 
       .complexity-label {
@@ -327,45 +364,46 @@
         font-family: 'Roboto Mono', monospace;
         letter-spacing: 1px;
         opacity: 0.7;
-        animation: complexity-pulse 6s infinite;
+        animation: complexity-pulse 4s infinite;
+      }
+
+      .flow-chevron {
+        fill: var(--mat-sys-primary);
+        opacity: 0.45;
       }
 
       .sub-node {
         circle {
           fill: var(--glass-input-bg);
           stroke: var(--glass-border);
-          stroke-width: 1;
+          stroke-width: 1.5;
+          transition: all 0.3s ease;
         }
         .sub-label {
-          font-size: 7.5px;
-          fill: var(--glass-text-muted);
+          font-size: 8px;
+          font-weight: 600;
+          fill: var(--glass-text);
           font-family: 'Roboto Mono', monospace;
           letter-spacing: 0.5px;
+          pointer-events: none;
         }
 
-        &.s1 circle {
-          animation: node-glow-sub 6s infinite;
-          animation-delay: 2.1s;
+        &.s-ctr circle {
+          animation: node-glow-sub 4s infinite;
+          animation-delay: 1.7s;
         }
-        &.p1 circle {
-          animation: node-glow-sub 6s infinite;
-          animation-delay: 2.6s;
+        &.s-add circle {
+          animation: node-glow-sub 4s infinite;
+          animation-delay: 2.2s;
         }
-        &.n1 circle {
-          animation: node-glow-sub 6s infinite;
-          animation-delay: 3.1s;
+        &.s-rot circle {
+          animation: node-glow-sub 4s infinite;
+          animation-delay: 2.7s;
         }
-        &.a1 circle {
-          animation: node-glow-sub 6s infinite;
-          animation-delay: 3.7s;
+        &.s-xor circle {
+          animation: node-glow-sub 4s infinite;
+          animation-delay: 3.2s;
         }
-      }
-
-      .sub-trace {
-        fill: none;
-        stroke: var(--glass-border);
-        stroke-width: 1;
-        opacity: 0.35;
       }
     }
   }
@@ -863,38 +901,49 @@
 
 @keyframes pulse-line {
   0% {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: 120;
   }
   100% {
-    stroke-dashoffset: -2100;
+    stroke-dashoffset: -680;
+  }
+}
+
+@keyframes feedback-dash {
+  from {
+    stroke-dashoffset: 14;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
 @keyframes node-glow {
   0%,
-  10%,
+  14%,
   100% {
     fill: var(--glass-input-bg);
     stroke: var(--glass-border);
     transform: scale(1);
+    filter: none;
   }
-  5% {
-    fill: rgba(var(--mat-sys-primary-rgb), 0.1);
+  6% {
+    fill: rgba(var(--mat-sys-primary-rgb), 0.15);
     stroke: var(--mat-sys-primary);
-    transform: scale(1.05);
+    transform: scale(1.04);
     filter: drop-shadow(0 0 10px var(--glass-glow));
   }
 }
 
 @keyframes node-glow-sub {
   0%,
-  10%,
+  14%,
   100% {
     fill: var(--glass-input-bg);
     stroke: var(--glass-border);
+    filter: none;
   }
-  5% {
-    fill: var(--mat-sys-primary);
+  6% {
+    fill: rgba(var(--mat-sys-primary-rgb), 0.3);
     stroke: var(--mat-sys-primary);
     filter: drop-shadow(0 0 8px var(--glass-glow));
   }
