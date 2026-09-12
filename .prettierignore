@@ -1,0 +1,12 @@
+# Ignore cache/build directories
+dist
+out
+d-asp/rust/target
+d-asp/python/__pycache__
+
+# Ignore logs with invalid JSON
+d-asp/logs
+
+# Ignore crypto test artifacts
+d-asp/node/key.json
+d-asp/node/cipher.json

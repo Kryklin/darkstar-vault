@@ -1,0 +1,81 @@
+<div class="home-container" [class.game-active-pulse]="mode === 'GAME'">
+  @if (mode !== 'NONE') {
+    <canvas #matrixCanvas class="matrix-overlay"></canvas>
+  }
+
+  <div class="content-wrapper page-layout-wrapper">
+    <mat-card class="info-card glass-card hero-card">
+      <mat-card-header>
+        <mat-card-title class="app-title premium-glitch-auto" data-text="DARKSTAR">DARKSTAR</mat-card-title>
+        <mat-card-subtitle class="subtitle-text">Quantum-Safe Information Security</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content class="hero-content">
+        <div class="verify-shield" [class.verified]="integrityPassed()">
+          <div class="shield-icon-wrapper">
+            <mat-icon class="shield-icon">{{ integrityPassed() ? 'verified_user' : 'security' }}</mat-icon>
+            <div class="pulse-ring"></div>
+          </div>
+          <div class="shield-text">
+            <span class="shield-title">Application Integrity</span>
+            <span class="shield-status">{{ integrityPassed() ? 'Verified & Secure' : 'Authenticating Node...' }}</span>
+          </div>
+          <div class="shine"></div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <footer class="footer">
+      <p>&copy; 2026. All Rights Reserved.</p>
+
+      <div class="version-badge">
+        <span class="version-text" (click)="handleVersionClick()" (keydown.enter)="handleVersionClick()" (keydown.space)="handleVersionClick()" tabindex="0" role="button">
+          Version {{ version }}
+        </span>
+
+        @if (updateService.versionLocked()) {
+          <div class="status-indicator locked">
+            <mat-icon>priority_high</mat-icon>
+            <span>Locked</span>
+          </div>
+        } @else if (updateService.isChecking() || updateService.updateStatus() === 'checking') {
+          <div class="status-indicator checking">
+            <mat-spinner diameter="16" color="primary"></mat-spinner>
+            <span>Checking...</span>
+          </div>
+        } @else if (updateService.updateStatus() === 'available' || updateService.updateStatus() === 'downloading') {
+          <div class="status-indicator updating">
+            <mat-spinner diameter="16" color="primary"></mat-spinner>
+            <span>Updating...</span>
+          </div>
+        } @else if (updateService.updateStatus() === 'downloaded') {
+          <div
+            class="status-indicator ready"
+            (click)="updateService.quitAndInstall()"
+            (keydown.enter)="updateService.quitAndInstall()"
+            (keydown.space)="updateService.quitAndInstall()"
+            tabindex="0"
+            role="button"
+          >
+            <mat-icon>system_update</mat-icon>
+            <span>Restart Required</span>
+          </div>
+        } @else if (updateService.updateStatus() === 'alpha') {
+          <div class="status-indicator alpha-build">
+            <mat-icon>science</mat-icon>
+            <span>Developer Build</span>
+          </div>
+        } @else {
+          <div class="status-indicator up-to-date">
+            <mat-icon>check_circle</mat-icon>
+            <span>Live System</span>
+          </div>
+        }
+      </div>
+    </footer>
+  </div>
+
+  @if (showTerminal) {
+    <app-terminal (terminalClosed)="closeTerminal()"></app-terminal>
+  }
+</div>

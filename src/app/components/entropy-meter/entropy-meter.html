@@ -1,0 +1,12 @@
+<div class="entropy-container">
+  <div class="header">
+    <span class="label" [ngClass]="cssColorClass">{{ label }}</span>
+    <span class="crack-time" matTooltip="Estimated offline brute-force time against a rigorous attack."> <mat-icon class="time-icon">timer</mat-icon> Time to crack: {{ crackTime }} </span>
+  </div>
+
+  <mat-progress-bar [mode]="'determinate'" [value]="progressValue" [color]="color" class="meter-bar" [ngClass]="cssColorClass"> </mat-progress-bar>
+
+  <div class="stats">
+    <span class="bits">{{ entropy }} bits of entropy</span>
+  </div>
+</div>

@@ -1,0 +1,122 @@
+<div class="page-layout-wrapper">
+  <mat-card class="encrypt-card glass-card">
+    @if (!showResult) {
+      <mat-card-header>
+        <mat-card-title>{{ protocolTitle }}</mat-card-title>
+        <mat-card-subtitle>{{ protocolSummary }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="firstFormGroup">
+          <mat-form-field class="full-width">
+            <mat-label>{{ mnemonicLabel }}</mat-label>
+            <textarea matInput formControlName="firstCtrl" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="4" [placeholder]="mnemonicPlaceholder"></textarea>
+          </mat-form-field>
+          <div class="stepper-buttons" style="margin-top: 16px">
+            @if (randomWordsGenerator) {
+              <button mat-button (click)="onGenerateRandomWords()">Generate Random</button>
+            }
+            <button mat-raised-button color="primary" [disabled]="!firstFormGroup.valid || !vaultService.isUnlocked()" (click)="onSubmit()">Encrypt with Vault Key</button>
+          </div>
+          <div class="security-options" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px">
+            <mat-slide-toggle [(ngModel)]="useHardwareId" [ngModelOptions]="{ standalone: true }" color="warn"> Require Machine Hardware ID </mat-slide-toggle>
+            <p class="hint-text" style="font-size: 0.85em; margin: 0; opacity: 0.7">
+              Data will be locked to this specific device hardware. Recovery on other machines will require entering this ID manually.
+            </p>
+          </div>
+
+          @if (!vaultService.isUnlocked()) {
+            <p class="hint-text" style="color: var(--mat-sys-error)">Your Vault must be unlocked to access your ML-KEM-1024 encryption keys.</p>
+          }
+        </form>
+      </mat-card-content>
+      <mat-card-footer>
+        <p class="footer-text">Encryption is performed locally on your device. Your private data is never transmitted.</p>
+      </mat-card-footer>
+    } @else {
+      <mat-card-header>
+        <mat-card-title>Encryption Successful</mat-card-title>
+        <mat-card-subtitle>Your data has been securely encrypted.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field class="full-width">
+          <mat-label>Encrypted Data</mat-label>
+          <textarea matInput readonly [value]="encryptedData" rows="8"></textarea>
+          <button mat-icon-button matSuffix (click)="copyToClipboard(encryptedData)" matTooltip="Copy Encrypted Data">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <div class="qr-transfer-section" style="margin: 16px 0; padding: 16px; background: rgba(0, 145, 234, 0.05); border-radius: 8px; border: 1px solid rgba(0, 145, 234, 0.2)">
+          <div style="display: flex; align-items: center; justify-content: space-between">
+            <div>
+              <h3 style="margin: 0; display: flex; align-items: center; color: var(--mat-sys-primary)"><mat-icon style="margin-right: 8px">qr_code_scanner</mat-icon> Air-Gapped Optical Transfer</h3>
+              <p class="hint-text" style="margin: 4px 0 0 0">Securely transmit this encrypted payload to another device via webcam without networks.</p>
+            </div>
+            <button mat-stroked-button color="primary" (click)="showQrSender = !showQrSender">
+              <mat-icon>{{ showQrSender ? 'close' : 'qr_code' }}</mat-icon>
+              {{ showQrSender ? 'Hide Scanner' : 'Show Animated QR' }}
+            </button>
+          </div>
+
+          @if (showQrSender) {
+            <app-qr-sender [payload]="encryptedData"></app-qr-sender>
+          }
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <div class="stealth-export-section">
+          <h3>Stealth Export</h3>
+          <p class="hint-text">Disguise your encrypted data as a common system file.</p>
+
+          <div class="export-controls">
+            <mat-form-field appearance="outline">
+              <mat-label>Export Format</mat-label>
+              <mat-select [(value)]="stealthMode">
+                @for (mode of stealthModes; track mode) {
+                  <mat-option [value]="mode.value">{{ mode.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            @if (stealthMode !== 'standard') {
+              <div class="slider-container">
+                <span class="label">Noise Level: {{ stealthNoiseLevel * 100 }}%</span>
+                <mat-slider min="0.1" max="1.0" step="0.1" showTickMarks>
+                  <input matSliderThumb [(ngModel)]="stealthNoiseLevel" />
+                </mat-slider>
+              </div>
+            }
+
+            @if (stealthMode === 'image') {
+              <div class="cover-image-upload">
+                <button mat-stroked-button color="primary" (click)="coverInput.click()"><mat-icon>image</mat-icon> Select Cover Image</button>
+                <input #coverInput type="file" (change)="onCoverImageSelected($event)" style="display: none" accept="image/png, image/jpeg" />
+                <span class="file-name" style="margin-left: 10px; font-size: 0.9em">{{ selectedCoverImage?.name || 'No image selected' }}</span>
+                <p class="hint-text">Select a PNG or JPEG image to hide your data in.</p>
+              </div>
+            }
+
+            @if (stealthMode === 'audio') {
+              <div class="cover-image-upload">
+                <button mat-stroked-button color="primary" (click)="coverAudioInput.click()"><mat-icon>audiotrack</mat-icon> Select Cover Audio (Optional)</button>
+                <input #coverAudioInput type="file" (change)="onCoverAudioSelected($event)" style="display: none" accept="audio/wav" />
+                <span class="file-name" style="margin-left: 10px; font-size: 0.9em">{{ selectedCoverAudio?.name || 'No file selected (White Noise will be generated)' }}</span>
+                <p class="hint-text">Select a WAV file to hide your data in.</p>
+              </div>
+            }
+          </div>
+
+          <button mat-flat-button color="accent" (click)="downloadFile()"><mat-icon>download</mat-icon> Download {{ stealthMode === 'standard' ? 'Text' : 'File' }}</button>
+          <button mat-button color="primary" (click)="downloadPaperWallet()" style="margin-left: 8px"><mat-icon>print</mat-icon> Print Paper Wallet (PDF)</button>
+        </div>
+      </mat-card-content>
+      <mat-card-actions class="result-actions">
+        <button mat-button (click)="reset()">Reset</button>
+      </mat-card-actions>
+      <mat-card-footer>
+        <p class="footer-text">Store the encrypted data securely. Your Vault Key will be used to recover the plaintext.</p>
+      </mat-card-footer>
+    }
+  </mat-card>
+</div>

@@ -1,0 +1,438 @@
+// Include theming for Angular Material with `mat.theme()`.
+// This Sass mixin will define CSS variables that are used for styling Angular Material
+// components according to the Material 3 design spec.
+// Learn more about theming and how to use it for your application's
+// custom components at https://material.angular.dev/guide/theming
+@use '@angular/material' as mat;
+@use './app/styles/themes';
+@use './app/styles/glass';
+@import 'material-icons/iconfont/material-icons.css';
+@import 'prismjs/themes/prism-tomorrow.css';
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  overflow: hidden; // Prevent body scroll (app content scrolls)
+  background-color: #0b0b0b !important; // Prevent initial white flash
+
+  // Dynamic Background using Theme Variables
+  background: linear-gradient(-45deg, var(--mat-sys-surface-container-lowest), var(--mat-sys-surface-container-low), var(--mat-sys-surface-container), var(--mat-sys-surface-container-high));
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+
+  color: var(--mat-sys-on-surface);
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+// Global Glass Variables
+:root {
+  color-scheme: dark; // Enforces dark mode on native browser elements (like standard scrollbars)
+  --glass-bg: rgba(15, 15, 15, 0.45);
+  --glass-bg-accent: rgba(64, 196, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --glass-text: #ffffff;
+  --glass-text-muted: rgba(255, 255, 255, 0.55);
+  --glass-glow: rgba(64, 196, 255, 0.4);
+  --glass-input-bg: rgba(255, 255, 255, 0.04);
+  --mat-sys-error-rgb: 244, 67, 54;
+}
+
+// Global Material Overrides for Glass Aesthetic
+::ng-deep {
+  /* Tab Overrides */
+  .mat-mdc-tab-group {
+    --mdc-tab-indicator-active-indicator-color: var(--mat-sys-primary);
+    --mat-tab-header-active-label-text-color: var(--mat-sys-primary);
+    --mat-tab-header-inactive-label-text-color: var(--glass-text-muted);
+
+    .mat-mdc-tab-header {
+      border-bottom: 1px solid var(--glass-border) !important;
+      margin-bottom: 12px;
+    }
+
+    .mat-mdc-tab .mdc-tab__text-label {
+      font-weight: 300;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+    }
+
+    .mat-mdc-tab:hover .mdc-tab__text-label {
+      color: var(--glass-text) !important;
+    }
+  }
+
+  /* Form Field Overrides */
+  .mat-mdc-form-field {
+    .mat-mdc-form-field-focus-indicator {
+      display: none;
+    }
+
+    .mat-mdc-text-field-wrapper {
+      background: var(--glass-input-bg) !important;
+      border: 1px solid var(--glass-border) !important;
+      border-radius: 12px !important;
+      transition: all 0.3s ease !important;
+
+      &:hover {
+        border-color: rgba(64, 196, 255, 0.4) !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+      }
+    }
+
+    &.mat-focused .mat-mdc-text-field-wrapper {
+      border-color: var(--mat-sys-primary) !important;
+      box-shadow: 0 0 15px rgba(var(--mat-sys-primary-rgb), 0.15);
+    }
+
+    .mat-mdc-form-field-label {
+      color: var(--glass-text-muted) !important;
+    }
+    .mat-mdc-input-element {
+      color: var(--glass-text) !important;
+    }
+    .mat-mdc-select-value {
+      color: var(--glass-text) !important;
+    }
+  }
+
+  /* Button Enhancements */
+  .mat-mdc-raised-button {
+    border-radius: 20px !important;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+
+    &:not([disabled]):hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 10px 20px rgba(0, 0, 0, 0.3),
+        0 0 15px rgba(var(--mat-sys-primary-rgb), 0.3) !important;
+    }
+
+    &:not([disabled]):active {
+      transform: translateY(0);
+    }
+  }
+}
+
+// Global Scrollbar Polish
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2); // Darker track
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2); // Semi-transparent white
+  border-radius: 5px;
+  border: 2px solid rgba(0, 0, 0, 0.2); // Creates padding effect between thumb and track
+  background-clip: padding-box;
+  transition: background 0.3s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.4); // Brighter on hover
+    background-clip: padding-box;
+  }
+}
+
+@include themes.apply-themes;
+
+.app-title {
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: linear-gradient(to right, var(--mat-sys-on-surface) 20%, var(--mat-sys-primary) 40%, var(--mat-sys-primary) 60%, var(--mat-sys-on-surface) 80%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 5s linear infinite;
+
+  @media (max-width: 768px) {
+    font-size: 1.5rem !important;
+    letter-spacing: 2px !important;
+  }
+}
+
+body.light-theme .app-title {
+  background: linear-gradient(to right, var(--mat-sys-primary) 0%, var(--mat-sys-tertiary) 50%, var(--mat-sys-primary) 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+// Legacy Warning Snackbar
+.legacy-warning-snackbar {
+  --mdc-snackbar-container-color: #d32f2f; // Material Red 700
+  --mdc-snackbar-supporting-text-color: #ffffff;
+  --mat-snack-bar-button-color: #ffffff;
+
+  .mdc-snackbar__surface {
+    border: 2px solid #ffcdd2; // Light Red Border
+    box-shadow: 0px 4px 20px rgba(211, 47, 47, 0.4);
+    animation: snackbar-pulse 2s infinite;
+  }
+}
+
+@keyframes snackbar-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+  }
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 10px rgba(211, 47, 47, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+  }
+}
+
+// Mobile Utility: Break long hashes/addresses
+.break-word {
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+  white-space: normal !important;
+}
+
+// Premium Scroll: "Bump" effect and touch physics
+.scroll-bounce {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+
+  // Subtle visual feedback when hitting scroll limits (active state)
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+// Global Layout Pattern: Settings & Tool Rows
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--glass-input-bg);
+  border: 1px solid var(--glass-border);
+
+  &:hover {
+    background: rgba(var(--mat-sys-primary-rgb), 0.06);
+    border-color: rgba(var(--mat-sys-primary-rgb), 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .setting-label {
+    display: flex;
+    flex-direction: column;
+    max-width: 70%;
+
+    @media (max-width: 600px) {
+      max-width: 100%;
+    }
+
+    .title {
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: var(--glass-text);
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .description {
+      font-size: 0.9rem;
+      color: var(--glass-text-muted);
+      line-height: 1.5;
+    }
+
+    .path-info {
+      font-size: 0.8rem;
+      opacity: 0.6;
+      font-family: 'Roboto Mono', monospace;
+      display: block;
+      margin-top: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--glass-border);
+    }
+  }
+
+  .duress-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+
+    mat-form-field {
+      width: 260px;
+      margin-bottom: 0 !important;
+
+      ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+        display: none;
+      }
+    }
+
+    button {
+      height: 48px;
+      min-width: 100px;
+    }
+
+    @media (max-width: 650px) {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+
+      mat-form-field {
+        width: 100%;
+      }
+    }
+  }
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 12px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+
+  &.warn {
+    color: #ff9d00;
+    background: rgba(255, 157, 0, 0.1);
+    border-color: rgba(255, 157, 0, 0.3);
+  }
+
+  &.success {
+    color: #00e676;
+    background: rgba(0, 230, 118, 0.1);
+    border-color: rgba(0, 230, 118, 0.3);
+  }
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: var(--glass-text);
+  font-size: 0.95rem;
+
+  .color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  }
+}
+
+// Global Re-Architecture: Page Width Constraint
+// Ensures app content doesn't stretch infinitely on ultrawide monitors and maintains a premium centered reading posture.
+.page-layout-wrapper {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 24px;
+  width: 100%;
+  box-sizing: border-box;
+
+  @media (max-width: 768px) {
+    margin: 1rem auto;
+    padding: 0 16px;
+  }
+}
+
+// Premium Component Aesthetic
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 12px;
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+  overflow: hidden;
+
+  // Inner glow effect
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    z-index: 1;
+  }
+
+  // Interactive hover physics
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.5),
+      0 0 20px rgba(64, 196, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+// Apply premium background to native material cards directly if they don't have .glass-card
+mat-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px !important;
+}
+
+mat-card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+}

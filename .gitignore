@@ -1,0 +1,222 @@
+# =============================================================================
+# DARKSTAR — Project-wide .gitignore
+# Covers: Angular/Electron, Rust, Go, C, CUDA, Node.js, Python, C# (.NET), Zig
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Angular / TypeScript / Electron
+# -----------------------------------------------------------------------------
+/dist
+/out
+/out-tsc
+/bazel-out
+/.angular/cache
+/coverage
+/typings
+/tmp
+
+# Node
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# Build output (compiled Electron main)
+/electron/main.js
+/electron/main.js.map
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+
+# Local crypto engine binaries
+/bin
+
+
+# -----------------------------------------------------------------------------
+# IDEs and editors
+# -----------------------------------------------------------------------------
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.history/
+
+# Visual Studio Code — keep shared workspace settings, ignore personal state
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains
+*.iml
+out/
+
+# Visual Studio
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# -----------------------------------------------------------------------------
+# System files
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# -----------------------------------------------------------------------------
+# Secrets / local environment
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# -----------------------------------------------------------------------------
+# Rust engine  (d-asp/rust)
+# -----------------------------------------------------------------------------
+d-asp/rust/target/
+# Keep Cargo.lock for binaries
+# !d-asp/rust/Cargo.lock
+
+# -----------------------------------------------------------------------------
+# Go engine  (d-asp/go)
+# -----------------------------------------------------------------------------
+d-asp/go/main
+d-asp/go/main.exe
+d-asp/go/d-asp.exe
+d-asp/go/d-asp_go.exe
+d-asp/go/dasp.exe
+
+# -----------------------------------------------------------------------------
+# C engine  (d-asp/c)
+# -----------------------------------------------------------------------------
+d-asp/c/dasp
+d-asp/c/dasp.exe
+d-asp/c/dasp_asan.exe
+d-asp/c/dasp_asan.pdb
+# Compiled object files
+d-asp/c/*.obj
+d-asp/c/*.o
+# MSVC / Clang linker artefacts
+d-asp/c/*.exp
+d-asp/c/*.lib
+d-asp/c/*.pdb
+# Shared library output (rebuilt on demand)
+d-asp/c/dasp_kem.dll
+d-asp/c/dasp_kem.lib
+d-asp/c/dasp_kem.exp
+d-asp/c/dasp.lib
+d-asp/c/dasp.exp
+# Misc output files left by tooling
+d-asp/c/out.txt
+
+# -----------------------------------------------------------------------------
+# CUDA engine  (d-asp/cuda)
+# -----------------------------------------------------------------------------
+d-asp/cuda/d-asp_cuda.exe
+d-asp/cuda/d-asp_cuda.exp
+d-asp/cuda/d-asp_cuda.lib
+d-asp/cuda/d-asp_test.exe
+d-asp/cuda/d-asp_test.exp
+d-asp/cuda/d-asp_test.lib
+d-asp/cuda/*.obj
+d-asp/cuda/*.o
+d-asp/cuda/*.pdb
+
+# -----------------------------------------------------------------------------
+# Node.js engine  (d-asp/node)
+# -----------------------------------------------------------------------------
+d-asp/node/node_modules/
+d-asp/node/dist/
+d-asp/node/cipher.json
+d-asp/node/key.json
+
+# -----------------------------------------------------------------------------
+# Python engine  (d-asp/python)
+# -----------------------------------------------------------------------------
+d-asp/python/__pycache__/
+d-asp/python/*.pyc
+d-asp/python/*.pyo
+d-asp/python/.venv/
+d-asp/python/venv/
+d-asp/python/dist/
+
+# -----------------------------------------------------------------------------
+# C# / .NET engine  (d-asp/csharp)
+# -----------------------------------------------------------------------------
+d-asp/csharp/bin/
+d-asp/csharp/obj/
+# The DLL is built from d-asp/c — do not commit the copy
+d-asp/csharp/dasp_kem.dll
+
+# -----------------------------------------------------------------------------
+# Zig engine  (d-asp/zig)
+# -----------------------------------------------------------------------------
+d-asp/zig/.zig-cache/
+d-asp/zig/zig-out/
+d-asp/zig/dist/
+
+# -----------------------------------------------------------------------------
+# Toolchain archives / downloaded binaries  (tools/)
+# -----------------------------------------------------------------------------
+tools/
+*.zip
+*.tar.gz
+*.tar.xz
+# dotnet install script (downloaded, not authored)
+dotnet-install.ps1
+
+# -----------------------------------------------------------------------------
+# KAT / interop runtime artefacts
+# -----------------------------------------------------------------------------
+# Temp files written by test harnesses during runs
+d-asp/**/interop.json
+d-asp/**/tmp_sk.hex
+d-asp/**/tmp_pk.hex
+d-asp/**/tmp_data.json
+d-asp/**/tmp_hwid.hex
+# Benchmark log sessions (timestamped directories)
+d-asp/logs/
+# Generated KAT & NIST artefacts — regenerated on demand
+d-asp/scripts/kat_vectors.json
+d-asp/scripts/master_keys.txt
+d-asp/scripts/nist_kat.rsp
+d-asp/scripts/log/
+# Generated checksums (produced during release pipeline)
+checksums.txt
+# Adhoc test JSON files in root
+cuda_test.json
+
+# -----------------------------------------------------------------------------
+# Mobile builds (Capacitor / iOS / Android)
+# -----------------------------------------------------------------------------
+/ios/App/build/
+/ios/App/Pods/
+/ios/App/DerivedData/
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/captures/
+
+# -----------------------------------------------------------------------------
+# Miscellaneous
+# -----------------------------------------------------------------------------
+.sass-cache/
+/connect.lock
+/libpeerconnection.log
+testem.log
+# Log files (project-wide)
+*.log
+# Plans directory (internal)
+plans/

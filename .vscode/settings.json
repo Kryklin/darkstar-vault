@@ -1,0 +1,50 @@
+{
+  "files.associations": {
+    "*.cu": "cuda-cpp",
+    "*.h": "cpp"
+  },
+  "C_Cpp.default.configurationProvider": "ms-vscode.cpptools",
+
+  // ── Source Control ──────────────────────────────────────────────────────────
+  // Suppress the "too many changes" warning — git status is correct, VS Code
+  // expands untracked directories which inflates the count.
+  "git.ignoreLimitWarning": true,
+  // Show untracked files separately so new source files are visible but not
+  // mixed into the modified-file count.
+  "git.untrackedChanges": "separate",
+
+  // ── File Watcher Exclusions ──────────────────────────────────────────────────
+  // Exclude heavy build output directories from the file watcher entirely.
+  // This prevents VS Code from scanning tens of thousands of compiled artefacts.
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "d-asp/rust/target/**": true,
+    "d-asp/c/*.obj": true,
+    "d-asp/c/*.o": true,
+    "d-asp/cuda/*.obj": true,
+    "d-asp/cuda/*.o": true,
+    "d-asp/csharp/bin/**": true,
+    "d-asp/csharp/obj/**": true,
+    "d-asp/zig/.zig-cache/**": true,
+    "d-asp/zig/zig-out/**": true,
+    "d-asp/logs/**": true,
+    "tools/**": true
+  },
+
+  // ── Explorer Exclusions ──────────────────────────────────────────────────────
+  // Hide build artefact directories from the file explorer sidebar.
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "d-asp/rust/target": true,
+    "d-asp/csharp/bin": true,
+    "d-asp/csharp/obj": true,
+    "d-asp/zig/.zig-cache": true,
+    "d-asp/zig/zig-out": true,
+    "d-asp/logs": true,
+    "tools": true
+  }
+}

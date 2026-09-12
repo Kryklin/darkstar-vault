@@ -1,0 +1,263 @@
+<div class="vault-container">
+  <!-- PRIMARY NAVIGATION: TABS -->
+  <header class="vault-nav-header glass-panel">
+    <div class="header-left">
+      <div class="nav-brand premium-glitch-auto" data-text="DARKSTAR VAULT">DARKSTAR VAULT</div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button mat-button [class.active]="activeTab() === 'notes'" (click)="activeTab.set('notes')"><mat-icon>description</mat-icon> <span>Notes</span></button>
+      <button mat-button [class.active]="activeTab() === 'files'" (click)="activeTab.set('files')"><mat-icon>folder_zip</mat-icon> <span>Secure Files</span></button>
+      <button mat-button [class.active]="activeTab() === 'settings'" (click)="activeTab.set('settings')"><mat-icon>settings</mat-icon> <span>Setup</span></button>
+    </nav>
+
+    <div class="nav-actions">
+      <button mat-icon-button class="lock-btn" (click)="lock()" matTooltip="Lock Vault immediately">
+        <mat-icon>lock</mat-icon>
+      </button>
+    </div>
+  </header>
+
+  <div class="vault-content-area">
+    @if (activeTab() === 'notes') {
+      <mat-sidenav-container class="sidenav-container">
+        <!-- SIDEBAR: Note List -->
+        <mat-sidenav [mode]="isHandset() ? 'over' : 'side'" [opened]="sidenavOpened()" (openedChange)="sidenavOpened.set($event)" class="notes-sidebar">
+          <!-- NOTES LIST SECTION -->
+          <div class="sidebar-section">
+            <div class="section-header">
+              <span>Notes</span>
+              <button mat-icon-button (click)="createNote()" matTooltip="New Note">
+                <mat-icon>add</mat-icon>
+              </button>
+            </div>
+            <div class="search-box">
+              <mat-form-field appearance="outline" class="dense-form-field">
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput placeholder="Search..." [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" />
+              </mat-form-field>
+            </div>
+            <mat-nav-list class="custom-scroll scroll-bounce note-list">
+              @for (note of filteredNotes(); track note.id) {
+                <a mat-list-item [class.active]="selectedNote()?.id === note.id" (click)="selectNote(note)" (keydown.enter)="selectNote(note)" tabindex="0">
+                  <h4 matListItemTitle>{{ note.title || 'Untitled Note' }}</h4>
+                  <p matListItemLine class="note-date">{{ note.updatedAt | date: 'short' }}</p>
+                </a>
+              }
+              @if (filteredNotes().length === 0) {
+                <div class="empty-state">No notes found.</div>
+              }
+            </mat-nav-list>
+          </div>
+        </mat-sidenav>
+
+        <!-- MAIN EDITOR -->
+        <mat-sidenav-content class="editor-content">
+          @if (selectedNote()) {
+            <div class="editor-wrapper">
+              <!-- (Keep existing editor header, formatting toolbar, and body logic) -->
+              <div class="editor-header-group">
+                <div class="editor-header">
+                  <input class="title-input" [(ngModel)]="currentTitle" (ngModelChange)="onContentChange()" placeholder="Note Title" />
+                  <div class="header-actions">
+                    <button mat-icon-button (click)="togglePreview()" [matTooltip]="showPreview ? 'Edit' : 'Preview'">
+                      <mat-icon>{{ showPreview ? 'edit' : 'visibility' }}</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="deleteCurrentNote()" color="warn"><mat-icon>delete</mat-icon></button>
+                  </div>
+                </div>
+
+                @if (!showPreview) {
+                  <div class="tags-input-row">
+                    <mat-form-field appearance="outline" class="tags-field">
+                      <mat-chip-grid #chipGrid>
+                        @for (tag of currentTags; track tag) {
+                          <mat-chip-row (removed)="removeTag(tag)">{{ tag }}<mat-icon matChipRemove>cancel</mat-icon></mat-chip-row>
+                        }
+                        <input placeholder="Tags..." [matChipInputFor]="chipGrid" (matChipInputTokenEnd)="addTag($event)" />
+                      </mat-chip-grid>
+                    </mat-form-field>
+                  </div>
+                }
+              </div>
+
+              <!-- TOOLBAR -->
+              @if (!showPreview) {
+                <div class="editor-toolbar">
+                  <button mat-icon-button (click)="insertFormat('bold')"><mat-icon>format_bold</mat-icon></button>
+                  <button mat-icon-button (click)="insertFormat('italic')"><mat-icon>format_italic</mat-icon></button>
+                  <mat-divider vertical></mat-divider>
+                  <button mat-icon-button (click)="triggerImageUpload()"><mat-icon>image</mat-icon></button>
+                  <button mat-icon-button (click)="fileInput.click()"><mat-icon>attach_file</mat-icon></button>
+                  <input type="file" #fileInput hidden (change)="handleFileUpload($event)" />
+                  <input type="file" #imageInput hidden (change)="handleImageUpload($event)" accept="image/*" />
+                </div>
+              }
+
+              <div class="editor-body">
+                @if (showPreview) {
+                  <article class="markdown-preview custom-scroll">
+                    <markdown [data]="currentContent"></markdown>
+                    @if (currentAttachments.length) {
+                      <div class="attachments-section">
+                        <h5>Attachments</h5>
+                        <mat-list>
+                          @for (f of currentAttachments; track f.id) {
+                            <mat-list-item>
+                              <mat-icon matListItemIcon>description</mat-icon>
+                              <span matListItemTitle>{{ f.name }}</span>
+                              <button mat-icon-button matListItemMeta (click)="downloadFile(f)" (keydown.enter)="downloadFile(f)"><mat-icon>download</mat-icon></button>
+                            </mat-list-item>
+                          }
+                        </mat-list>
+                      </div>
+                    }
+                  </article>
+                } @else {
+                  <textarea #editorArea class="content-input custom-scroll" [(ngModel)]="currentContent" (ngModelChange)="onContentChange()"></textarea>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="no-selection-state">
+              <mat-card class="glass-hero-card animate-slide-up">
+                <mat-icon class="huge-icon">lock_open</mat-icon>
+                <mat-card-header>
+                  <mat-card-title>ENCRYPTED STORAGE ACTIVE</mat-card-title>
+                  <mat-card-subtitle>Vault Unlocked & Secure</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <p>Your notes and secrets are decrypted in memory. Select a note from the sidebar to begin editing or create a new entry.</p>
+                </mat-card-content>
+                <mat-card-actions class="hero-actions">
+                  <button mat-flat-button color="primary" (click)="createNote()"><mat-icon>add</mat-icon> CREATE NEW NOTE</button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
+          }
+        </mat-sidenav-content>
+      </mat-sidenav-container>
+    } @else if (activeTab() === 'files') {
+      <app-vault-files></app-vault-files>
+    } @else if (activeTab() === 'settings') {
+      <div class="settings-view custom-scroll animate-fade-in">
+        <div class="settings-grid">
+          <!-- IDENTITY MODULE: Digital Passport -->
+          <div class="settings-module identity-module">
+            <div class="module-header">
+              <mat-icon>fingerprint</mat-icon>
+              <span>Cryptographic Identity</span>
+            </div>
+
+            <div class="digital-passport">
+              <div class="passport-glow"></div>
+              <div class="passport-content">
+                <div class="passport-header">
+                  <div class="passport-brand">D-ASP SIGNAL</div>
+                  <div class="passport-status">
+                    @if (isQuantumSafe()) {
+                      <div class="status-badge quantum"><mat-icon>auto_awesome</mat-icon> Quantum Safe</div>
+                    } @else {
+                      <div class="status-badge standard"><mat-icon>security</mat-icon> Standard</div>
+                    }
+                  </div>
+                </div>
+
+                <div class="fingerprint-display">
+                  <div class="label">IDENTITY FINGERPRINT</div>
+                  <div class="value">
+                    <code>{{ identityFingerprint() }}</code>
+                    <button mat-icon-button (click)="copyIdentity()" matTooltip="Copy ID">
+                      <mat-icon>content_copy</mat-icon>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="passport-footer">
+                  <div class="pqc-marker">ASP CASCADE 16</div>
+                  <mat-icon class="watermark">lock</mat-icon>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-actions">
+              <button mat-flat-button class="action-btn" (click)="backupIdentity()"><mat-icon>cloud_download</mat-icon> BACKUP IDENTITY</button>
+              <button mat-stroked-button class="action-btn" (click)="recoverIdentity()"><mat-icon>restore</mat-icon> RECOVER IDENTITY</button>
+            </div>
+          </div>
+
+          <!-- HARDWARE MODULE: Machine Binding -->
+          <div class="settings-module device-module">
+            <div class="module-header">
+              <mat-icon>hub</mat-icon>
+              <span>Hardware Integrity</span>
+            </div>
+
+            <div class="glass-card hardware-card">
+              @if (hardwareId()) {
+                <div class="hw-status-header">
+                  <div class="status-indicator active"></div>
+                  <span>BOUND TO HOST</span>
+                </div>
+                <div class="hw-id-box">
+                  <mat-icon class="hw-icon">computer</mat-icon>
+                  <div class="hw-details">
+                    <div class="label">MACHINE SIGNATURE</div>
+                    <code>{{ hardwareId() }}</code>
+                  </div>
+                </div>
+                <p class="hw-hint">This vault is cryptographically bound to this device's hardware root. Local safeStorage is enforced.</p>
+              } @else {
+                <div class="hw-status-header">
+                  <div class="status-indicator warning"></div>
+                  <span>GENERIC STORAGE</span>
+                </div>
+                <p class="hw-hint">No hardware signature detected. Using standard envelope encryption.</p>
+              }
+            </div>
+
+            <div class="info-module">
+              <div class="module-header">
+                <mat-icon>info</mat-icon>
+                <span>Protocol Info</span>
+              </div>
+              <div class="info-card glass-card">
+                <div class="info-item">
+                  <span class="label">Engine</span>
+                  <span class="value">D-ASP (Rust)</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">Encryption</span>
+                  <span class="value">AES-256-GCM (Hardened)</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">PQC Layer</span>
+                  <span class="value">ML-KEM-1024</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DANGER ZONE: Advanced Actions -->
+          <div class="settings-module danger-module full-width">
+            <mat-expansion-panel class="danger-panel glass-card">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon color="warn">warning</mat-icon>
+                  <span class="danger-title">ADVANCED OPS & DESTRUCTION</span>
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+
+              <div class="danger-panel-content">
+                <div class="danger-hint">
+                  Performing a vault purge will permanently erase all local storage, identities, and encrypted data. This action is irreversible unless you have an identity backup.
+                </div>
+                <button mat-flat-button class="purge-btn pulse-red" (click)="vaultService.deleteVault()"><mat-icon>delete_forever</mat-icon> ERASE ALL VAULT DATA (PURGE)</button>
+              </div>
+            </mat-expansion-panel>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

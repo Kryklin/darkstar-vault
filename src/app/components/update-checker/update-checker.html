@@ -1,0 +1,56 @@
+<div class="update-container">
+  <div class="glass-card" @fadeInOut>
+    <!-- Checking / Downloading State -->
+    @if (showProgressBar()) {
+      <mat-icon class="spin">sync</mat-icon>
+      <h2>{{ getStatusMessage() }}</h2>
+      <div class="progress-wrapper">
+        <mat-progress-bar mode="indeterminate" color="primary"></mat-progress-bar>
+      </div>
+    }
+
+    <!-- Available State (Mobile/Web) -->
+    @else if (updateService.updateStatus() === 'available' && !isElectron) {
+      <mat-icon class="info-icon">cloud_download</mat-icon>
+      <h2>{{ getStatusMessage() }}</h2>
+      <p>A new version of Darkstar is available on GitHub.</p>
+      <div class="actions">
+        <button mat-flat-button color="primary" (click)="restart()">Download APK / IPA</button>
+        <button mat-button (click)="goHome()">Remind Me Later</button>
+      </div>
+    }
+
+    <!-- Success State -->
+    @else if (updateService.updateStatus() === 'downloaded') {
+      <mat-icon class="success-icon">check_circle_outline</mat-icon>
+      <h2>Update Ready</h2>
+      <p>A new version has been downloaded and is ready to install.</p>
+      <button mat-flat-button color="primary" (click)="restart()">Restart & Install</button>
+    }
+
+    <!-- Up to Date -->
+    @else if (updateService.updateStatus() === 'not-available') {
+      <mat-icon class="info-icon">verified_user</mat-icon>
+      <h2>Up to Date</h2>
+      <p>You are running the latest version.</p>
+    }
+
+    <!-- Error State -->
+    @else if (updateService.updateStatus() === 'error') {
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h2>Update Failed</h2>
+      <p>{{ updateService.updateError() }}</p>
+      <button mat-stroked-button (click)="goHome()">Return Home</button>
+    }
+
+    <!-- Alpha State -->
+    @else if (updateService.updateStatus() === 'alpha') {
+      <div class="alpha-badge">
+        <mat-icon>science</mat-icon>
+      </div>
+      <h2>Developer Build</h2>
+      <p>You are on the bleeding edge.</p>
+      <button mat-stroked-button (click)="goHome()">Return Home</button>
+    }
+  </div>
+</div>

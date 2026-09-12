@@ -1,0 +1,81 @@
+@use '../../styles/glass';
+
+.settings-container {
+  padding: 50px 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+
+  h1 {
+    font-size: 2.8rem;
+    margin-bottom: 30px;
+    font-weight: 200;
+    text-align: center;
+    letter-spacing: 8px;
+    color: var(--glass-text);
+    text-shadow: 0 0 30px var(--glass-glow);
+    animation: fadeIn 1s ease-out;
+
+    @media (max-width: 768px) {
+      font-size: 1.8rem;
+      letter-spacing: 4px;
+      margin-bottom: 20px;
+    }
+  }
+}
+
+.tab-content {
+  padding: 30px 0;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.settings-section {
+  @include glass.glass-panel;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  margin-bottom: 30px;
+  padding: 30px;
+
+  h2 {
+    margin: 0 0 25px 0;
+    font-weight: 300;
+    font-size: 1.4rem;
+    letter-spacing: 1px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--glass-border);
+    color: var(--mat-sys-primary);
+
+    @media (max-width: 768px) {
+      font-size: 1.2rem;
+      margin-bottom: 15px;
+    }
+  }
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+}
+
+.engine-option,
+.engine-option-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  i {
+    font-size: 1.2rem;
+
+    &.colored {
+      filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.1));
+    }
+  }
+}
+
+.engine-option-trigger {
+  i {
+    font-size: 1.1rem;
+  }
+}

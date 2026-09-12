@@ -1,0 +1,121 @@
+<mat-sidenav-container class="sidenav-container" [hasBackdrop]="isMobile()">
+  <mat-sidenav #drawer class="sidenav" fixedInViewport [mode]="isMobile() ? 'over' : 'side'" [opened]="layoutService.sidenavOpen()" (openedChange)="layoutService.sidenavOpen.set($event)">
+    <div class="sidebar-content">
+      <div class="sidebar-header-box">
+        <img [src]="theme.logoSrc()" alt="DARKSTAR" class="sidebar-logo" />
+      </div>
+      <mat-nav-list>
+        <!-- Home Dashboard -->
+        <a mat-list-item routerLink="/home" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+          <div class="nav-link-center">
+            <mat-icon>dashboard</mat-icon>
+            <span style="margin-left: 10px">Dashboard</span>
+          </div>
+        </a>
+
+        <!-- Vault -->
+        <a mat-list-item routerLink="/vault" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+          <div class="nav-link-center">
+            <mat-icon>enhanced_encryption</mat-icon>
+            <span style="margin-left: 10px">Secure Vault</span>
+          </div>
+        </a>
+
+        @if (vaultService.isUnlocked()) {
+          <div @slideFade>
+            <div class="nav-divider"></div>
+            <span class="nav-section-title">Security Tools</span>
+
+            <!-- Secure Notes -->
+            <a mat-list-item routerLink="/secure-notes" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+              <div class="nav-link-center">
+                <mat-icon>notes</mat-icon>
+                <span style="margin-left: 10px">Secure Messages</span>
+              </div>
+            </a>
+
+            <!-- BIP39 Tools -->
+            <a mat-list-item routerLink="/bip39" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+              <div class="nav-link-center">
+                <mat-icon>security</mat-icon>
+                <span style="margin-left: 10px">BIP39 Tools</span>
+              </div>
+            </a>
+
+            <!-- SLIP39 Tools -->
+            <a mat-list-item routerLink="/slip39" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+              <div class="nav-link-center">
+                <mat-icon>splitscreen</mat-icon>
+                <span style="margin-left: 10px">SLIP39 Tools</span>
+              </div>
+            </a>
+
+            <!-- Electrum Tools -->
+            <a mat-list-item routerLink="/electrum" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+              <div class="nav-link-center">
+                <mat-icon>bolt</mat-icon>
+                <span style="margin-left: 10px">Electrum Tools</span>
+              </div>
+            </a>
+          </div>
+        }
+
+        <div class="nav-divider"></div>
+
+        <!-- About -->
+        <a mat-list-item routerLink="/about" routerLinkActive="active-link" [class.disabled-link]="updateService.isChecking()" (click)="closeOnMobile()">
+          <div class="nav-link-center">
+            <mat-icon>info</mat-icon>
+            <span style="margin-left: 10px">About</span>
+          </div>
+        </a>
+      </mat-nav-list>
+    </div>
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <mat-toolbar color="primary">
+      <button type="button" aria-label="Toggle sidenav" mat-icon-button (click)="drawer.toggle()">
+        <mat-icon aria-label="Side nav toggle icon">menu</mat-icon>
+      </button>
+
+      <!-- Vault Status Indicator (Moved to left) -->
+      <div class="vault-status-badge" [class.unlocked]="vaultService.isUnlocked()" [class.missing]="!vaultService.exists()" routerLink="/vault">
+        <mat-icon>{{ !vaultService.exists() ? 'warning' : vaultService.isUnlocked() ? 'lock_open' : 'lock' }}</mat-icon>
+        <span class="status-label">
+          {{ !vaultService.exists() ? 'No Vault Created' : vaultService.isUnlocked() ? 'Vault Unlocked' : 'Vault Locked' }}
+        </span>
+      </div>
+
+      <span class="spacer"></span>
+
+      <!-- Realtime Clock (Muted & Centeredish) -->
+      <div class="toolbar-center-wrapper">
+        <div class="toolbar-clock">
+          <span class="time">{{ currentTime() | date: 'HH:mm:ss' }}</span>
+          <span class="date">{{ currentTime() | date: 'EEE, MMM d' }}</span>
+        </div>
+      </div>
+
+      <span class="spacer"></span>
+
+      <button mat-icon-button routerLink="/settings" aria-label="Open settings" (click)="closeOnMobile()" class="settings-cog">
+        <mat-icon>settings</mat-icon>
+      </button>
+
+      @if (isElectron) {
+        <button mat-icon-button (click)="minimize()">
+          <mat-icon>minimize</mat-icon>
+        </button>
+        <button mat-icon-button (click)="maximize()">
+          <mat-icon>crop_square</mat-icon>
+        </button>
+        <button mat-icon-button (click)="close()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-toolbar>
+    <div class="content-scroll-container">
+      <router-outlet></router-outlet>
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

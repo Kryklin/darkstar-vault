@@ -1,0 +1,109 @@
+<div class="container page-layout-wrapper">
+  @if (!showResult) {
+    <mat-card class="decrypt-card glass-card">
+      <mat-card-header>
+        <mat-card-title>Decrypt {{ protocolTitle }}</mat-card-title>
+        <mat-card-subtitle>Enter the encrypted data and password to decrypt your mnemonic phrase.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="firstFormGroup">
+          <div class="input-mode-container" style="margin-bottom: 16px">
+            <mat-button-toggle-group [(ngModel)]="inputType" [ngModelOptions]="{ standalone: true }" aria-label="Input Mode">
+              <mat-button-toggle value="text">Paste Text</mat-button-toggle>
+              <mat-button-toggle value="file">Upload File</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          @if (inputType === 'file') {
+            <div class="file-upload-area" style="margin-bottom: 20px">
+              <button mat-stroked-button color="primary" (click)="fileInput.click()"><mat-icon>upload_file</mat-icon> Choose Stealth File</button>
+              <input #fileInput type="file" (change)="onFileSelected($event)" style="display: none" accept=".log,.csv,.json,.txt,.png" />
+              <span class="file-name">{{ fileName || 'No file selected' }}</span>
+              <p class="hint-text">Upload a file exported with Stealth Export (including PNG images).</p>
+
+              @if (isFileProcessing) {
+                <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              }
+            </div>
+          }
+
+          <mat-form-field appearance="fill" class="full-width" [class.hidden-input]="inputType === 'file'">
+            <mat-label>{{ inputType === 'file' ? 'Extracted Data' : 'Encrypted Data' }}</mat-label>
+            <textarea matInput formControlName="encryptedData" rows="4" [placeholder]="inputType === 'file' ? 'Data extracted from file will appear here' : 'Paste the encrypted data here'"></textarea>
+            <button mat-icon-button matSuffix (click)="copyFromClipboard('encryptedData')" matTooltip="Paste from clipboard" [disabled]="inputType === 'file'">
+              <mat-icon>content_paste</mat-icon>
+            </button>
+            @if (firstFormGroup.controls['encryptedData'].hasError('required')) {
+              <mat-error>Encrypted data is required.</mat-error>
+            }
+          </mat-form-field>
+
+          <div class="security-options" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px">
+            <mat-slide-toggle [(ngModel)]="useHardwareId" [ngModelOptions]="{ standalone: true }" color="warn"> Require Machine Hardware ID </mat-slide-toggle>
+            <p class="hint-text" style="font-size: 0.85em; margin: 0; opacity: 0.7">Enable this if the data was bound to a specific device.</p>
+          </div>
+
+          @if (inputType === 'text') {
+            <div class="qr-receive-section" style="margin: 16px 0; padding: 16px; background: rgba(0, 145, 234, 0.05); border-radius: 8px; border: 1px solid rgba(0, 145, 234, 0.2)">
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <div>
+                  <h3 style="margin: 0; display: flex; align-items: center; color: var(--mat-sys-primary)">
+                    <mat-icon style="margin-right: 8px">qr_code_scanner</mat-icon> Air-Gapped Optical Transfer
+                  </h3>
+                  <p class="hint-text" style="margin: 4px 0 0 0">Scan an animated payload from another device's screen.</p>
+                </div>
+                <button mat-stroked-button color="primary" (click)="showQrReceiver = !showQrReceiver; $event.preventDefault()">
+                  <mat-icon>{{ showQrReceiver ? 'close' : 'qr_code' }}</mat-icon>
+                  {{ showQrReceiver ? 'Close Scanner' : 'Open Camera' }}
+                </button>
+              </div>
+
+              @if (showQrReceiver) {
+                <div style="margin-top: 16px">
+                  <app-qr-receiver (payloadReceived)="onQrScanned($event)"></app-qr-receiver>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="actions-section" style="margin-top: 24px">
+            <button mat-raised-button color="primary" class="full-width-btn" [disabled]="!firstFormGroup.valid || !vaultService.isUnlocked()" (click)="onSubmit()">
+              <mat-icon>fingerprint</mat-icon> Decrypt with Vault Identity
+            </button>
+            @if (!vaultService.isUnlocked()) {
+              <p class="hint-text" style="color: var(--mat-sys-error); text-align: center; margin-top: 8px">Your Vault must be unlocked to access your ML-KEM-1024 recovery keys.</p>
+            }
+          </div>
+        </form>
+      </mat-card-content>
+      <mat-card-footer>
+        <p class="footer-text">Decryption is performed locally on your device. Your private data is never transmitted.</p>
+      </mat-card-footer>
+    </mat-card>
+  } @else {
+    <mat-card class="result-card">
+      <mat-card-header>
+        @if (error) {
+          <mat-card-title class="error-title">Decryption Failed</mat-card-title>
+        } @else {
+          <mat-card-title>Decryption Successful</mat-card-title>
+        }
+      </mat-card-header>
+      <mat-card-content>
+        @if (error) {
+          <div class="error-content">
+            <p>{{ error }}</p>
+          </div>
+        } @else {
+          <div class="result-content">
+            <p><strong>Decrypted Mnemonic:</strong></p>
+            <p class="mnemonic-phrase">{{ decryptedMnemonic }}</p>
+          </div>
+        }
+      </mat-card-content>
+      <mat-card-actions class="result-actions">
+        <button mat-button (click)="reset()">Reset</button>
+      </mat-card-actions>
+    </mat-card>
+  }
+</div>

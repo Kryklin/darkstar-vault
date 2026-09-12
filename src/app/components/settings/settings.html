@@ -1,0 +1,283 @@
+<div class="settings-container page-layout-wrapper">
+  <h1>Settings</h1>
+
+  <mat-tab-group dynamicHeight animationDuration="300ms">
+    <!-- GENERAL TAB -->
+    <mat-tab label="General">
+      <div class="tab-content">
+        <section class="settings-section glass-card">
+          <h2>Appearance</h2>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Color Theme</span>
+              <span class="description">Select the accent color for the application</span>
+            </div>
+            <mat-form-field appearance="outline">
+              <mat-label>Select Theme</mat-label>
+              <mat-select [value]="theme.selectedTheme()" (selectionChange)="theme.setTheme($event.value)" [compareWith]="compareThemes">
+                <mat-select-trigger>
+                  <div class="theme-option">
+                    <span class="color-dot" [style.background-color]="theme.selectedTheme().primary"></span>
+                    {{ theme.selectedTheme().name }}
+                  </div>
+                </mat-select-trigger>
+                @for (t of theme.availableThemes; track t.name) {
+                  <mat-option [value]="t">
+                    <div class="theme-option">
+                      <span class="color-dot" [style.background-color]="t.primary"></span>
+                      {{ t.name }}
+                    </div>
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </section>
+
+        @if (isWindows || isElectron) {
+          <section class="settings-section glass-card">
+            <h2>System</h2>
+            @if (isWindows) {
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="title">Shortcuts</span>
+                  <span class="description">Create desktop and start menu shortcuts</span>
+                </div>
+                <div class="button-group">
+                  <button mat-stroked-button (click)="createShortcut('desktop')">Desktop Shortcut</button>
+                  <button mat-stroked-button (click)="createShortcut('start-menu')">Start Menu Shortcut</button>
+                </div>
+              </div>
+            }
+
+            @if (isElectron) {
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="title">Version Locking</span>
+                  <span class="description">Prevent automatic updates and stay on the current version</span>
+                </div>
+                <mat-slide-toggle [checked]="updateService.versionLocked()" (change)="updateService.toggleVersionLock()" color="warn"> </mat-slide-toggle>
+              </div>
+            }
+          </section>
+        }
+      </div>
+    </mat-tab>
+
+    <!-- SECURITY TAB -->
+    <mat-tab label="Security">
+      <div class="tab-content">
+        <section class="settings-section glass-card">
+          <h2>Core Protection</h2>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Cryptographic Engine</span>
+              <span class="description">Select the backend engine executing D-KASP-512 transformations. All run strictly offline.</span>
+            </div>
+            <mat-form-field appearance="outline">
+              <mat-label>Execution Backend</mat-label>
+              <mat-select [(ngModel)]="dkaspEngine">
+                <mat-select-trigger>
+                  <div class="engine-option-trigger">
+                    @if (dkaspEngine === 'rust') {
+                      <i class="devicon-rust-plain colored"></i>
+                    }
+                    @if (dkaspEngine === 'go') {
+                      <i class="devicon-go-plain colored"></i>
+                    }
+                    @if (dkaspEngine === 'c') {
+                      <i class="devicon-c-plain colored"></i>
+                    }
+                    @if (dkaspEngine === 'node') {
+                      <i class="devicon-nodejs-plain colored"></i>
+                    }
+                    @if (dkaspEngine === 'python') {
+                      <i class="devicon-python-plain colored"></i>
+                    }
+                    <span style="margin-left: 8px; text-transform: capitalize">{{ dkaspEngine }}</span>
+                  </div>
+                </mat-select-trigger>
+                <mat-option value="rust">
+                  <div class="engine-option">
+                    <i class="devicon-rust-plain colored"></i>
+                    <span>Rust</span>
+                  </div>
+                </mat-option>
+                <mat-option value="go">
+                  <div class="engine-option">
+                    <i class="devicon-go-plain colored"></i>
+                    <span>Go</span>
+                  </div>
+                </mat-option>
+                <mat-option value="c">
+                  <div class="engine-option">
+                    <i class="devicon-c-plain colored"></i>
+                    <span>C</span>
+                  </div>
+                </mat-option>
+                <mat-option value="node">
+                  <div class="engine-option">
+                    <i class="devicon-nodejs-plain colored"></i>
+                    <span>Node.js</span>
+                  </div>
+                </mat-option>
+                <mat-option value="python">
+                  <div class="engine-option">
+                    <i class="devicon-python-plain colored"></i>
+                    <span>Python</span>
+                  </div>
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Duress / Panic Mode</span>
+              <span class="description"> Set a specific password that will <strong>permanently destroy</strong> your vault if entered. </span>
+            </div>
+            <div class="duress-controls">
+              @if (duressService.isDuressConfigured()) {
+                <span class="status-badge warn">Active</span>
+                <button mat-stroked-button color="warn" (click)="clearDuress()">Disable</button>
+              } @else {
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Panic Password</mat-label>
+                  <input matInput type="password" [(ngModel)]="duressPassword" />
+                </mat-form-field>
+                <button mat-flat-button color="warn" [disabled]="!duressPassword" (click)="setDuress()">Set</button>
+              }
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section glass-card">
+          <h2>Authenticators</h2>
+          @if (isBiometricEnabled) {
+            <div class="setting-row">
+              <div class="setting-label">
+                <span class="title">Enforce Biometric Unlock</span>
+                <span class="description" style="color: var(--mat-sys-error); font-weight: 500">
+                  CRITICAL: Disables the master password field entirely. Ensure your hardware is active to avoid lockout.
+                </span>
+              </div>
+              <mat-slide-toggle [(ngModel)]="isBiometricForced" [disabled]="!vaultService.isUnlocked()" color="primary"></mat-slide-toggle>
+            </div>
+          }
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">TOTP (2FA)</span>
+              <span class="description">Require an authenticator app code to unlock your vault</span>
+            </div>
+            <div class="duress-controls">
+              @if (isTotpEnabled) {
+                <span class="status-badge success">Enabled</span>
+                <button mat-stroked-button color="warn" (click)="toggleTotp()">Disable</button>
+              } @else {
+                <button mat-flat-button color="primary" (click)="toggleTotp()">Set Up 2FA</button>
+              }
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">{{ authName }}</span>
+              <span class="description">Use {{ authName }} to unlock your vault on this device</span>
+            </div>
+            <div class="duress-controls">
+              @if (isBiometricEnabled) {
+                <span class="status-badge success">Enabled</span>
+                <button mat-stroked-button color="warn" (click)="toggleBiometrics()">Disable</button>
+              } @else {
+                <button mat-flat-button color="primary" [disabled]="isRegisteringBiometrics" (click)="toggleBiometrics()">
+                  @if (!isRegisteringBiometrics) {
+                    <span>Enable {{ authName }}</span>
+                  }
+                  @if (isRegisteringBiometrics) {
+                    <mat-spinner diameter="20"></mat-spinner>
+                  }
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Hardware Security Key</span>
+              <span class="description">Use a YubiKey or FIDO2 device to unlock your vault</span>
+            </div>
+            <div class="duress-controls">
+              @if (isHardwareKeyEnabled) {
+                <span class="status-badge success">Linked</span>
+                <button mat-stroked-button color="warn" (click)="toggleHardwareKey()">Unlink</button>
+              } @else {
+                <button mat-flat-button color="primary" [disabled]="isRegisteringHardwareKey" (click)="toggleHardwareKey()">
+                  @if (!isRegisteringHardwareKey) {
+                    <span>Register YubiKey</span>
+                  }
+                  @if (isRegisteringHardwareKey) {
+                    <mat-spinner diameter="20"></mat-spinner>
+                  }
+                </button>
+              }
+            </div>
+          </div>
+        </section>
+      </div>
+    </mat-tab>
+
+    <!-- BACKUPS TAB -->
+    <mat-tab label="Backups">
+      <div class="tab-content">
+        <section class="settings-section glass-card">
+          <h2>Vault Backups</h2>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Automated Backups</span>
+              <span class="description">Configure scheduled exports of your vault data</span>
+              @if (isElectron && resolvedBackupPath) {
+                <span class="path-info break-word">Target: {{ resolvedBackupPath }}</span>
+              }
+            </div>
+            <button mat-flat-button color="primary" (click)="openBackupConfig()">Configure</button>
+          </div>
+
+          @if (isElectron) {
+            <div class="setting-row">
+              <div class="setting-label">
+                <span class="title">Restore from Backup</span>
+                <span class="description">Select a previous backup file to restore your vault</span>
+              </div>
+              <button mat-flat-button color="warn" (click)="restoreBackup()">Restore</button>
+            </div>
+          }
+        </section>
+      </div>
+    </mat-tab>
+
+    <!-- MAINTENANCE TAB -->
+    <mat-tab label="Maintenance">
+      <div class="tab-content">
+        <section class="settings-section glass-card">
+          <h2>Destructive Actions</h2>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Reset Vault</span>
+              <span class="description">Delete all encrypted notes and reset the vault</span>
+            </div>
+            <button mat-stroked-button color="warn" (click)="resetVault()">Reset Vault</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="title">Reset Application</span>
+              <span class="description">Clear all data and restart the application</span>
+            </div>
+            <button mat-flat-button color="warn" (click)="resetApp()">Reset App</button>
+          </div>
+        </section>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

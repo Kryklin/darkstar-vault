@@ -1,0 +1,54 @@
+<div class="terminal-overlay" [class.active]="isVisible" (click)="minimizeTerminal()" (keydown.escape)="minimizeTerminal()" tabindex="-1">
+  <div
+    class="terminal-container"
+    [class.terminal-visible]="isVisible"
+    [class.terminal-maximized]="isMaximized"
+    cdkDrag
+    [cdkDragDisabled]="isMaximized || isNative"
+    (cdkDragStarted)="focusInput()"
+    (click)="focusInput($event)"
+    (keydown.enter)="focusInput($event)"
+    tabindex="0"
+  >
+    <div class="terminal-header" cdkDragHandle (click)="focusInput($event)" (keydown.enter)="focusInput($event)" tabindex="0">
+      <div class="terminal-title">
+        <mat-icon inline="true" style="font-size: 14px; margin-right: 5px; vertical-align: text-bottom">code</mat-icon>
+        Windows PowerShell
+      </div>
+      <div class="terminal-controls">
+        @if (!isNative) {
+          <button class="control-btn minimize" (click)="$event.stopPropagation(); minimizeTerminal()" aria-label="Minimize">&minus;</button>
+          <button class="control-btn maximize" (click)="$event.stopPropagation(); toggleMaximize()" aria-label="Maximize">&#10064;</button>
+        }
+        <button class="control-btn close" (click)="$event.stopPropagation(); closeTerminal()" aria-label="Close">&#10005;</button>
+      </div>
+    </div>
+
+    <div class="terminal-body" #terminalBody (click)="focusInput($event)" (keydown.enter)="focusInput($event)" tabindex="0">
+      <div class="terminal-intro">
+        <pre class="ascii-art">
+   DARKSTAR OS
+</pre
+        >
+        Windows PowerShell<br />
+        Copyright (C) Microsoft Corporation. All rights reserved.<br /><br />
+        Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows<br /><br />
+        Type "help" to see available Darkstar commands.
+      </div>
+
+      @for (line of history; track $index) {
+        <div class="terminal-line" [class.command]="line.isCommand" [class.error]="line.isError" [class.success]="line.isSuccess">
+          @if (line.isCommand) {
+            <span class="prompt">PS C:\Users\guest></span>
+          }
+          <span class="content">{{ line.text }}</span>
+        </div>
+      }
+
+      <div class="terminal-input-line">
+        <span class="prompt">PS C:\Users\guest></span>
+        <input #terminalInput type="text" class="terminal-input" [(ngModel)]="currentInput" (keydown)="handleKeyDown($event)" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+  </div>
+</div>

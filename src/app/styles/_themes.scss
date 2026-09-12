@@ -1,0 +1,119 @@
+@use 'sass:map';
+@use '@angular/material' as mat;
+@use 'generated/crimson-void';
+@use 'generated/solar-flare';
+@use 'generated/amber-glow';
+@use 'generated/forest-whisper';
+@use 'generated/teal-torrent';
+@use 'generated/neon-cyberpunk';
+@use 'generated/oceanic-depth';
+@use 'generated/royal-amethyst';
+@use 'generated/magenta-madness';
+@use 'generated/golden-sands';
+@use 'generated/midnight-slate';
+@use 'generated/barbie-pink';
+@use 'generated/toxic-sludge';
+@use 'generated/vapor-wave';
+@use 'generated/arctic-frost';
+@use 'generated/obsidian-shard';
+
+$themes: (
+  'crimson-void': (
+    primary: crimson-void.$primary-palette,
+    tertiary: crimson-void.$tertiary-palette,
+  ),
+  'solar-flare': (
+    primary: solar-flare.$primary-palette,
+    tertiary: solar-flare.$tertiary-palette,
+  ),
+  'amber-glow': (
+    primary: amber-glow.$primary-palette,
+    tertiary: amber-glow.$tertiary-palette,
+  ),
+  'forest-whisper': (
+    primary: forest-whisper.$primary-palette,
+    tertiary: forest-whisper.$tertiary-palette,
+  ),
+  'teal-torrent': (
+    primary: teal-torrent.$primary-palette,
+    tertiary: teal-torrent.$tertiary-palette,
+  ),
+  'neon-cyberpunk': (
+    primary: neon-cyberpunk.$primary-palette,
+    tertiary: neon-cyberpunk.$tertiary-palette,
+  ),
+  'oceanic-depth': (
+    primary: oceanic-depth.$primary-palette,
+    tertiary: oceanic-depth.$tertiary-palette,
+  ),
+  'royal-amethyst': (
+    primary: royal-amethyst.$primary-palette,
+    tertiary: royal-amethyst.$tertiary-palette,
+  ),
+  'magenta-madness': (
+    primary: magenta-madness.$primary-palette,
+    tertiary: magenta-madness.$tertiary-palette,
+  ),
+  'golden-sands': (
+    primary: golden-sands.$primary-palette,
+    tertiary: golden-sands.$tertiary-palette,
+  ),
+  'midnight-slate': (
+    primary: midnight-slate.$primary-palette,
+    tertiary: midnight-slate.$tertiary-palette,
+  ),
+  'barbie-pink': (
+    primary: barbie-pink.$primary-palette,
+    tertiary: barbie-pink.$tertiary-palette,
+  ),
+  'toxic-sludge': (
+    primary: toxic-sludge.$primary-palette,
+    tertiary: toxic-sludge.$tertiary-palette,
+  ),
+  'vapor-wave': (
+    primary: vapor-wave.$primary-palette,
+    tertiary: vapor-wave.$tertiary-palette,
+  ),
+  'arctic-frost': (
+    primary: arctic-frost.$primary-palette,
+    tertiary: arctic-frost.$tertiary-palette,
+  ),
+  'obsidian-shard': (
+    primary: obsidian-shard.$primary-palette,
+    tertiary: obsidian-shard.$tertiary-palette,
+  ),
+);
+
+@mixin apply-themes {
+  @each $name, $palettes in $themes {
+    .theme-#{$name} {
+      &.dark-theme {
+        @include mat.theme(
+          (
+            color: (
+              theme-type: dark,
+              primary: map.get($palettes, primary),
+              tertiary: map.get($palettes, tertiary),
+            ),
+            typography: Roboto,
+            density: 0,
+          )
+        );
+      }
+
+      &.light-theme {
+        @include mat.theme(
+          (
+            color: (
+              theme-type: light,
+              primary: map.get($palettes, primary),
+              tertiary: map.get($palettes, tertiary),
+            ),
+            typography: Roboto,
+            density: 0,
+          )
+        );
+      }
+    }
+  }
+}

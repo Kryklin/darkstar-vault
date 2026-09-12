@@ -1,0 +1,19 @@
+@if (chunks.length > 0) {
+  <div class="qr-container">
+    <!-- The main animated canvas/img -->
+    <img [src]="chunks[currentFrame()]" alt="Animated QR Chunk" class="main-qr" />
+
+    <div class="controls">
+      <button mat-icon-button color="primary" (click)="togglePlayback()">
+        <mat-icon>{{ isPlaying() ? 'pause' : 'play_arrow' }}</mat-icon>
+      </button>
+
+      <span class="status-text"> Chunk {{ currentFrame() + 1 }} / {{ chunks.length }} </span>
+    </div>
+  </div>
+} @else {
+  <div class="qr-container">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p style="margin-top: 16px; opacity: 0.7">Generating Protocol QR Sequence...</p>
+  </div>
+}

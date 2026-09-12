@@ -1,0 +1,9 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+<mat-dialog-content>
+  <p>{{ data.message }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  @for (btn of data.buttons; track btn) {
+    <button mat-button [color]="btn.color || 'primary'" (click)="close(btn.value)">{{ btn.label }}</button>
+  }
+</mat-dialog-actions>

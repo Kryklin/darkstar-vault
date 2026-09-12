@@ -1,0 +1,180 @@
+<div class="about-container page-layout-wrapper">
+  <div class="about-hero">
+    <h1 class="premium-glitch-auto" data-text="DARKSTAR">DARKSTAR</h1>
+    <p class="subtitle">Sovereign Post-Quantum Protection Suite</p>
+    <div class="version-badge">v{{ version }} // STABLE</div>
+  </div>
+
+  <section class="deep-dive-section">
+    <h2 class="section-title">The D-ASP Protocol</h2>
+    <p class="section-intro">
+      D-ASP (Darkstar Algebraic Substitution & Permutation) is a sovereign encryption engine designed to provide bit-perfect interoperability across host environments while neutralizing both classical
+      analysis and quantum-state exploration.
+    </p>
+
+    <div class="phase-pipeline">
+      <!-- PHASE 1 -->
+      <div class="phase-card glass-card">
+        <div class="phase-number">01</div>
+        <div class="phase-icon"><span class="material-icons">hub</span></div>
+        <h3>Quantum Root</h3>
+        <p class="phase-tech">ML-KEM-1024 (Kyber)</p>
+        <p class="phase-desc">
+          Architecture begins with a NIST Level 5 Key Encapsulation. This establishes a 32-byte shared secret entangled against the recipient's identity, providing absolute immunity to Shor's quantum
+          search.
+        </p>
+      </div>
+
+      <!-- PHASE 2 -->
+      <div class="phase-card glass-card">
+        <div class="phase-number">02</div>
+        <div class="phase-icon"><span class="material-icons">Cyclone</span></div>
+        <h3>ASP Cascade 16</h3>
+        <p class="phase-tech">16-Round Balanced transformation</p>
+        <p class="phase-desc">
+          Every word undergoes 16 rounds of ASP Cascade logic (Substitution, Permutation, Network, Algebraic). Balanced schedules ensure S-Box confusion and MatrixHill diffusion are enforced at fixed
+          intervals to destroy statistical patterns.
+        </p>
+      </div>
+
+      <!-- PHASE 3 -->
+      <div class="phase-card glass-card">
+        <div class="phase-number">03</div>
+        <div class="phase-icon"><span class="material-icons">link</span></div>
+        <h3>Cipher Fusion</h3>
+        <p class="phase-tech">Inter-Word Chaining</p>
+        <p class="phase-desc">
+          Words are not isolated. The output of each transformation is fused into the state of the next using a SHA-256 XOR-chain, creating a global avalanche effect across the entire recovery phrase.
+        </p>
+      </div>
+
+      <!-- PHASE 4 -->
+      <div class="phase-card glass-card">
+        <div class="phase-number">04</div>
+        <div class="phase-icon"><span class="material-icons">terminal</span></div>
+        <h3>Kernel Parity</h3>
+        <p class="phase-tech">Multi-Language Interop</p>
+        <p class="phase-desc">
+          Strict deterministic pathing ensures that Rust, Go, Python, and Node.js implementations produce bit-perfect identical ciphertexts, allowing seamless cross-platform vault recovery.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="trace-section glass-card">
+    <div class="trace-header">
+      <div class="live-indicator"><span class="dot"></span> LIVE KERNEL TRACE</div>
+      <h3>Data Transformation Flow</h3>
+    </div>
+
+    <div class="flow-diagram-container">
+      <svg class="flow-svg" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
+        <!-- Connections -->
+        <path class="trace-path p1" d="M100 100 H200" />
+        <path class="trace-path p2" d="M300 100 H350" />
+        <path class="trace-path p3" d="M550 100 H600" />
+        <path class="trace-path pulse-path" d="M100 100 H200 M300 100 H350 M350 100 L375 80 L425 80 L450 100 L475 120 L525 120 L550 100 M550 100 H600" />
+
+        <!-- Nodes -->
+        <g class="node n1">
+          <circle cx="100" cy="100" r="30" />
+          <text x="100" y="105" text-anchor="middle" class="node-label">INPUT</text>
+        </g>
+        <g class="node n2">
+          <rect x="200" y="70" width="100" height="60" rx="8" />
+          <text x="250" y="105" text-anchor="middle" class="node-label">ML-KEM</text>
+        </g>
+
+        <!-- CASCADE SUB-SYSTEM -->
+        <g class="cascade-system">
+          <rect x="350" y="50" width="200" height="100" rx="12" class="cascade-frame" />
+          <text x="450" y="65" text-anchor="middle" class="node-label-main">ASP CASCADE 16</text>
+
+          <g class="sub-node s1">
+            <circle cx="400" cy="80" r="15" />
+            <text x="400" y="84" text-anchor="middle" class="sub-label">S</text>
+          </g>
+          <g class="sub-node p1">
+            <circle cx="450" cy="80" r="15" />
+            <text x="450" y="84" text-anchor="middle" class="sub-label">P</text>
+          </g>
+          <g class="sub-node n1">
+            <circle cx="500" cy="120" r="15" />
+            <text x="500" y="124" text-anchor="middle" class="sub-label">N</text>
+          </g>
+          <g class="sub-node a1">
+            <circle cx="450" cy="120" r="15" />
+            <text x="450" y="124" text-anchor="middle" class="sub-label">A</text>
+          </g>
+
+          <text x="450" y="145" text-anchor="middle" class="complexity-label">[ 16 ROUNDS / 64 LAYERS ]</text>
+          <path class="sub-trace" d="M375 80 H425 M450 100 L475 120 H525" />
+        </g>
+
+        <g class="node n4">
+          <circle cx="650" cy="100" r="40" />
+          <text x="650" y="105" text-anchor="middle" class="node-label">OUTPUT</text>
+        </g>
+      </svg>
+
+      <div class="example-data">
+        <div class="data-box in">
+          <span class="label">Source</span>
+          <span class="val">"apple"</span>
+        </div>
+        <div class="data-box out">
+          <span class="label">Result</span>
+          <span class="val">0x8F2A...9C</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tech-stack glass-card">
+    <h3>Engine Kernels</h3>
+    <div class="kernel-grid">
+      <div class="kernel-item"><i class="devicon-rust-plain"></i><span>Rust (Stable)</span></div>
+      <div class="kernel-item"><i class="devicon-go-plain"></i><span>Go (Optimized)</span></div>
+      <div class="kernel-item"><i class="devicon-nodejs-plain"></i><span>Node.js (Core)</span></div>
+      <div class="kernel-item"><i class="devicon-python-plain"></i><span>Python (Bridge)</span></div>
+    </div>
+  </section>
+
+  @if (hasAchievement()) {
+    <section class="achievements-section animate-slide-up">
+      <div class="achievement-badge mega-badge">
+        <div class="badge-glow"></div>
+        <div class="badge-content">
+          <mat-icon class="badge-icon">military_tech</mat-icon>
+          <div class="badge-info">
+            <span class="badge-title">CASCADE CERTIFIED</span>
+            <span class="badge-subtitle">D-ASP V9 ELITE INTEROP VALIDATION</span>
+          </div>
+        </div>
+        <div class="badge-decoration">
+          <span class="material-icons">stars</span>
+          <span class="material-icons">security</span>
+          <span class="material-icons">auto_awesome</span>
+        </div>
+      </div>
+    </section>
+  }
+
+  <section class="meta-section">
+    <div class="meta-links">
+      <button mat-stroked-button (click)="openLink(repoUrl)"><span class="material-icons">code</span> SOURCE REPOSITORY</button>
+      <button mat-stroked-button (click)="openLink(donationUrl)"><span class="material-icons">favorite</span> SUPPORT DEVELOPMENT</button>
+    </div>
+
+    <div class="meta-info">
+      <p>
+        Licensed under <strong>{{ licenseType }}</strong>
+      </p>
+      <p class="disclaimer">DARKSTAR IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. USERS ASSUME ALL RISK FOR RECOVERY PHRASE MANAGEMENT.</p>
+    </div>
+  </section>
+
+  <footer class="about-footer">
+    <p>© 2026 VICTOR KANE // DARKSTAR PROJECT</p>
+  </footer>
+</div>
