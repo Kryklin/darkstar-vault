@@ -45,19 +45,67 @@ export class CryptService {
   }
 
   /**
-   * Encrypts binary data (Uint8Array) via the D-ARX core.
+   * Encrypts binary data (Uint8Array) via chunked D-ARX core IPC.
+   * Splits arbitrary-length data into 16 KB chunks to prevent argument
+   * buffer overflow in the native process execution pipeline.
    */
   async encryptBinary(data: Uint8Array, keyMaterial: string, hwid?: string): Promise<Uint8Array> {
-    const base64Data = this.buf2base64(data);
-    const { encryptedData } = await this.encrypt(base64Data, keyMaterial, hwid);
-    return new TextEncoder().encode(encryptedData);
+    const CHUNK_SIZE = 16 * 1024; // 16 KB slice ceiling
+    const totalSize = data.length;
+    const chunks: string[] = [];
+
+    for (let offset = 0; offset < totalSize; offset += CHUNK_SIZE) {
+      const slice = data.subarray(offset, Math.min(offset + CHUNK_SIZE, totalSize));
+      const sliceBase64 = this.buf2base64(slice);
+      const { encryptedData } = await this.encrypt(sliceBase64, keyMaterial, hwid);
+      chunks.push(encryptedData);
+    }
+
+    const container = {
+      v: 1,
+      dArxChunked: true,
+      totalSize,
+      chunkSize: CHUNK_SIZE,
+      chunks,
+    };
+
+    return new TextEncoder().encode(JSON.stringify(container));
   }
 
   /**
    * Decrypts binary data (Uint8Array) via the D-ARX core.
+   * Seamlessly unpacks chunked container formats while supporting legacy single-blob payloads.
    */
   async decryptBinary(payload: Uint8Array, keyMaterial: string, hwid?: string): Promise<Uint8Array> {
     const payloadStr = new TextDecoder().decode(payload);
+
+    try {
+      const parsed = JSON.parse(payloadStr);
+      if (parsed && parsed.dArxChunked === true && Array.isArray(parsed.chunks)) {
+        const decryptedSlices: Uint8Array[] = [];
+        for (const chunk of parsed.chunks) {
+          const { decrypted } = await this.decrypt(chunk, '', keyMaterial, hwid);
+          const binaryStr = atob(decrypted);
+          const sliceBytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            sliceBytes[i] = binaryStr.charCodeAt(i);
+          }
+          decryptedSlices.push(sliceBytes);
+        }
+
+        const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
+        const result = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const slice of decryptedSlices) {
+          result.set(slice, offset);
+          offset += slice.length;
+        }
+        return result;
+      }
+    } catch {
+      // Fallback to legacy single-blob decryption if payload is not a chunked JSON envelope
+    }
+
     const { decrypted } = await this.decrypt(payloadStr, '', keyMaterial, hwid);
     const binaryStr = atob(decrypted);
     const len = binaryStr.length;

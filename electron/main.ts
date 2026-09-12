@@ -10,7 +10,7 @@ import { updateElectronApp } from 'update-electron-app';
 import { machineIdSync } from 'node-machine-id';
 import squirrelStartup from 'electron-squirrel-startup';
 import { authenticator } from 'otplib';
-import { verifyIntegrity } from './integrity';
+import { verifyIntegrity, isIntegrityVerified } from './integrity';
 import { DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, verifyEd25519Signature } from './trust-anchor';
 
 const execFileAsync = promisify(execFile);
@@ -366,7 +366,7 @@ ipcMain.handle('get-machine-id', () => {
   }
 });
 
-ipcMain.handle('check-integrity', () => true);
+ipcMain.handle('check-integrity', () => isIntegrityVerified());
 
 ipcMain.handle('vault-generate-totp', () => {
   const secret = authenticator.generateSecret();
@@ -453,10 +453,19 @@ ipcMain.handle('get-default-backup-path', () => path.join(app.getPath('documents
 
 ipcMain.handle('save-backup', async (_event, dir: string, filename: string, data: string) => {
   try {
+    // Validate filename against strict pattern to prevent path traversal
+    const cleanFilename = path.basename(filename);
+    if (!/^[a-zA-Z0-9_\-.]+\.backup$/.test(cleanFilename) || cleanFilename !== filename) {
+      throw new Error('Invalid backup filename: directory traversal or illegal characters detected.');
+    }
+
+    const safeTarget = path.resolve(dir, cleanFilename);
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, filename), data, 'utf-8');
+    // Restrict permissions to user-only read/write (0o600)
+    await fs.writeFile(safeTarget, data, { encoding: 'utf-8', mode: 0o600 });
     return true;
-  } catch {
+  } catch (err) {
+    console.error('Save Backup Failure:', err);
     return false;
   }
 });
@@ -478,8 +487,13 @@ ipcMain.handle('show-file-picker', async (event) => {
 
 ipcMain.handle('open-backup', async (_event, filePath: string) => {
   try {
-    return await fs.readFile(filePath, 'utf-8');
-  } catch {
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.toLowerCase().endsWith('.backup')) {
+      throw new Error('Invalid backup file extension.');
+    }
+    return await fs.readFile(resolvedPath, 'utf-8');
+  } catch (err) {
+    console.error('Open Backup Failure:', err);
     return null;
   }
 });
@@ -504,8 +518,8 @@ function getEngineCandidatePaths(): string[] {
   const ext = isWindows ? '.exe' : '';
   const candidateSearchPaths: string[] = [];
 
-  // 1. Explicit environment override
-  if (process.env.DARKSTAR_ENGINE_PATH) {
+  // 1. Explicit environment override - development only to prevent binary hijacking in production
+  if (!app.isPackaged && process.env.DARKSTAR_ENGINE_PATH) {
     candidateSearchPaths.push(process.env.DARKSTAR_ENGINE_PATH);
   }
 
@@ -600,76 +614,84 @@ async function fetchEngineFromReleases(): Promise<string> {
     return lower === `${targetAsset.name.toLowerCase()}.sha256` || lower.includes('checksum') || lower.includes('sha256sum') || lower === 'sha256.txt';
   });
 
-  if (checksumAsset) {
-    console.log(`[Darkstar Engine] Verifying checksum against release manifest ${checksumAsset.name}...`);
-    let csRes = await fetch(checksumAsset.browser_download_url, { headers });
-    if (csRes.status === 401 && headers['Authorization']) {
-      delete headers['Authorization'];
-      csRes = await fetch(checksumAsset.browser_download_url, { headers });
-    }
-    if (csRes.ok) {
-      const checksumText = await csRes.text();
-      let expectedHash: string | null = null;
-
-      const lines = checksumText.split(/\r?\n/);
-      for (const line of lines) {
-        if (line.includes(targetAsset.name)) {
-          const match = line.match(/[a-fA-F0-9]{64}/);
-          if (match) {
-            expectedHash = match[0].toLowerCase();
-            break;
-          }
-        }
-      }
-
-      if (!expectedHash && checksumAsset.name.toLowerCase().includes(targetAsset.name.toLowerCase())) {
-        const match = checksumText.match(/[a-fA-F0-9]{64}/);
-        if (match) {
-          expectedHash = match[0].toLowerCase();
-        }
-      }
-
-      if (expectedHash) {
-        if (computedHash !== expectedHash) {
-          throw new Error(`Provenance verification failed: SHA-256 checksum mismatch for ${targetAsset.name}!\n` + `Expected: ${expectedHash}\n` + `Computed: ${computedHash}`);
-        }
-        console.log(`[Darkstar Engine] Cryptographic provenance verified: SHA-256 matches manifest (${computedHash}).`);
-
-        // Check for an accompanying digital signature for the checksum manifest
-        const signatureAsset = release.assets.find((a) => {
-          const lower = a.name.toLowerCase();
-          return (
-            lower === `${checksumAsset.name.toLowerCase()}.sig` ||
-            lower === `${targetAsset.name.toLowerCase()}.sig` ||
-            lower.includes('checksums.txt.sig') ||
-            lower.includes('sha256sums.sig') ||
-            lower.includes('manifest.sig')
-          );
-        });
-
-        if (signatureAsset) {
-          console.log(`[Darkstar Engine] Authenticating release digital signature: ${signatureAsset.name}...`);
-          let sigRes = await fetch(signatureAsset.browser_download_url, { headers });
-          if (sigRes.status === 401 && headers['Authorization']) {
-            delete headers['Authorization'];
-            sigRes = await fetch(signatureAsset.browser_download_url, { headers });
-          }
-          if (sigRes.ok) {
-            const sigContent = await sigRes.text();
-            const isSigValid = verifyEd25519Signature(checksumText, sigContent, DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY);
-            if (!isSigValid) {
-              throw new Error(`Provenance verification failed: Release signature in ${signatureAsset.name} is invalid against the Darkstar Trust Anchor!`);
-            }
-            console.log('[Darkstar Engine] Cryptographic release provenance verified via Ed25519 digital signature.');
-          }
-        }
-      } else {
-        console.warn(`[Darkstar Engine] Checksum manifest did not contain explicit entry for ${targetAsset.name}.`);
-      }
-    }
-  } else {
-    console.warn(`[Darkstar Engine] Notice: No SHA-256 checksum manifest detected in release ${release.tag_name}.`);
+  if (!checksumAsset) {
+    throw new Error(`Mandatory release provenance failed: no SHA-256 checksum manifest found in release ${release.tag_name}. Refusing to download unauthenticated binary.`);
   }
+
+  console.log(`[Darkstar Engine] Verifying checksum against release manifest ${checksumAsset.name}...`);
+  let csRes = await fetch(checksumAsset.browser_download_url, { headers });
+  if (csRes.status === 401 && headers['Authorization']) {
+    delete headers['Authorization'];
+    csRes = await fetch(checksumAsset.browser_download_url, { headers });
+  }
+  if (!csRes.ok) {
+    throw new Error(`Failed to download checksum manifest ${checksumAsset.name}: ${csRes.statusText}`);
+  }
+
+  const checksumText = await csRes.text();
+  let expectedHash: string | null = null;
+
+  const lines = checksumText.split(/\r?\n/);
+  for (const line of lines) {
+    if (line.includes(targetAsset.name)) {
+      const match = line.match(/[a-fA-F0-9]{64}/);
+      if (match) {
+        expectedHash = match[0].toLowerCase();
+        break;
+      }
+    }
+  }
+
+  if (!expectedHash && checksumAsset.name.toLowerCase().includes(targetAsset.name.toLowerCase())) {
+    const match = checksumText.match(/[a-fA-F0-9]{64}/);
+    if (match) {
+      expectedHash = match[0].toLowerCase();
+    }
+  }
+
+  if (!expectedHash) {
+    throw new Error(`Mandatory release provenance failed: checksum manifest did not contain entry for ${targetAsset.name}.`);
+  }
+
+  if (computedHash !== expectedHash) {
+    throw new Error(`Provenance verification failed: SHA-256 checksum mismatch for ${targetAsset.name}!\nExpected: ${expectedHash}\nComputed: ${computedHash}`);
+  }
+  console.log(`[Darkstar Engine] Cryptographic provenance verified: SHA-256 matches manifest (${computedHash}).`);
+
+  // Mandatory digital signature verification
+  const signatureAsset = release.assets.find((a) => {
+    const lower = a.name.toLowerCase();
+    return (
+      lower === `${checksumAsset.name.toLowerCase()}.sig` ||
+      lower === `${targetAsset.name.toLowerCase()}.sig` ||
+      lower.includes('checksums.txt.sig') ||
+      lower.includes('sha256sums.sig') ||
+      lower.includes('manifest.sig')
+    );
+  });
+
+  if (!signatureAsset) {
+    throw new Error(
+      `Mandatory release provenance failed: no cryptographic digital signature (.sig) found for release ${release.tag_name}. Unsigned native engines are rejected by enclave security policy.`,
+    );
+  }
+
+  console.log(`[Darkstar Engine] Authenticating release digital signature: ${signatureAsset.name}...`);
+  let sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+  if (sigRes.status === 401 && headers['Authorization']) {
+    delete headers['Authorization'];
+    sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+  }
+  if (!sigRes.ok) {
+    throw new Error(`Failed to download release signature ${signatureAsset.name}: ${sigRes.statusText}`);
+  }
+
+  const sigContent = await sigRes.text();
+  const isSigValid = verifyEd25519Signature(checksumText, sigContent, DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY);
+  if (!isSigValid) {
+    throw new Error(`Provenance verification failed: Release signature in ${signatureAsset.name} is invalid against the Darkstar Trust Anchor!`);
+  }
+  console.log('[Darkstar Engine] Cryptographic release provenance verified via Ed25519 digital signature.');
 
   fsSync.writeFileSync(archivePath, fileBuffer);
 
@@ -884,7 +906,16 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
       }
     };
 
-    server = http.createServer(async (_req, res) => {
+    const capabilityToken = crypto.randomBytes(32).toString('hex');
+
+    server = http.createServer(async (req, res) => {
+      const reqUrl = new URL(req.url || '', 'http://127.0.0.1');
+      if (reqUrl.searchParams.get('token') !== capabilityToken) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Access Denied: Invalid capability token.');
+        return;
+      }
+
       // Helper to ensure all binary data is safely serialized to arrays
       const serializeBuffers = (obj: unknown): unknown => {
         if (Buffer.isBuffer(obj) || obj instanceof Uint8Array) return Array.from(obj);
@@ -931,10 +962,13 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
                     throw new Error('No credential returned');
                 }
 
+                const pubKeyDer = result.response && result.response.getPublicKey ? Array.from(new Uint8Array(result.response.getPublicKey())) : undefined;
+
                 const serialized = {
                     id: result.id,
                     rawId: Array.from(new Uint8Array(result.rawId)),
                     type: result.type,
+                    publicKey: pubKeyDer,
                     response: {
                         clientDataJSON: Array.from(new Uint8Array(result.response.clientDataJSON)),
                         attestationObject: result.response.attestationObject ? Array.from(new Uint8Array(result.response.attestationObject)) : undefined,
@@ -993,8 +1027,9 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
             return resolve({ success: false, error: 'Native verification failed: malformed WebAuthn assertion structure.' });
           }
 
+          let clientDataJson: Record<string, unknown>;
           try {
-            const clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
+            clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
             if (clientDataJson.type !== 'webauthn.get') {
               return resolve({ success: false, error: 'Native verification failed: assertion type mismatch.' });
             }
@@ -1012,13 +1047,56 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
               error: 'Native verification failed: authenticator did not assert User Verification (UV flag).',
             });
           }
+
+          // Challenge matching
+          const expectedChallenge = (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge;
+          if (expectedChallenge && clientDataJson.challenge) {
+            const rawChal = Array.isArray(expectedChallenge) ? Buffer.from(expectedChallenge) : Buffer.from(expectedChallenge);
+            const chalUrlSafe = rawChal.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            if (clientDataJson.challenge !== chalUrlSafe) {
+              return resolve({
+                success: false,
+                error: 'Native verification failed: challenge mismatch (replay defense).',
+              });
+            }
+          }
+
+          // Cryptographic ECDSA P-256 signature verification if registered public key is present
+          const rawPubKey = (options as { publicKey?: { credentialPublicKey?: number[] | string } }).publicKey?.credentialPublicKey;
+          if (rawPubKey) {
+            try {
+              const pubKeyBuf = Array.isArray(rawPubKey) ? Buffer.from(rawPubKey) : Buffer.from(rawPubKey, 'base64');
+              const clientDataHash = crypto.createHash('sha256').update(Buffer.from(clientDataArr)).digest();
+              const signedData = Buffer.concat([Buffer.from(authDataArr), clientDataHash]);
+
+              const keyObject = crypto.createPublicKey({
+                key: pubKeyBuf,
+                format: 'der',
+                type: 'spki',
+              });
+
+              const isSigVerified = crypto.verify('SHA256', signedData, keyObject, Buffer.from(sigArr));
+              if (!isSigVerified) {
+                return resolve({
+                  success: false,
+                  error: 'Native verification failed: authenticator signature mismatch against registered public key.',
+                });
+              }
+            } catch (verErr) {
+              console.warn('[WebAuthn] Assertion signature verification notice:', verErr);
+              return resolve({
+                success: false,
+                error: `Native verification failed: assertion signature check failed: ${(verErr as Error).message}`,
+              });
+            }
+          }
         }
 
         resolve(response);
       };
       ipcMain.on('handshake-result', resultHandler);
 
-      handshakeWin.loadURL(`http://localhost:${port}`);
+      handshakeWin.loadURL(`http://localhost:${port}/?token=${capabilityToken}`);
 
       setTimeout(async () => {
         if (server) {

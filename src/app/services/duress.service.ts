@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import * as CryptoJS from 'crypto-js';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
 
 @Injectable({
   providedIn: 'root',
@@ -15,7 +16,7 @@ export class DuressService {
    * @param password The duress password to set.
    */
   setDuressPassword(password: string): void {
-    const hash = CryptoJS.SHA256(password).toString();
+    const hash = bytesToHex(sha256(new TextEncoder().encode(password)));
     localStorage.setItem(this.storageKey, hash);
   }
 
@@ -41,7 +42,7 @@ export class DuressService {
     const storedHash = localStorage.getItem(this.storageKey);
     if (!storedHash) return false;
 
-    const inputHash = CryptoJS.SHA256(password).toString();
+    const inputHash = bytesToHex(sha256(new TextEncoder().encode(password)));
     return inputHash === storedHash;
   }
 

@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import CryptoJS from 'crypto-js';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { CryptService } from './crypt';
 
 export interface TimeLockMetadata {
@@ -16,13 +17,13 @@ export class TimeLockService {
   private HASHES_PER_SECOND = 1500000;
 
   public async computeDelay(seedHex: string, iterations: number, progressCallback?: (p: number) => void): Promise<string> {
-    let currentHash = CryptoJS.enc.Hex.parse(seedHex);
+    let currentHash: Uint8Array = hexToBytes(seedHex);
     const chunkSize = 20000;
 
     for (let i = 0; i < iterations; i += chunkSize) {
       const end = Math.min(i + chunkSize, iterations);
       for (let j = i; j < end; j++) {
-        currentHash = CryptoJS.SHA256(currentHash);
+        currentHash = sha256(currentHash);
       }
 
       if (progressCallback) {
@@ -32,12 +33,14 @@ export class TimeLockService {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    return currentHash.toString(CryptoJS.enc.Hex);
+    return bytesToHex(currentHash);
   }
 
   public async lockNoteContent(content: string, seconds: number, progressCallback?: (p: number) => void): Promise<{ encryptedData: string; metadata: TimeLockMetadata }> {
     const iterations = Math.max(1, seconds * this.HASHES_PER_SECOND);
-    const seed = CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
+    const seedBytes = new Uint8Array(32);
+    window.crypto.getRandomValues(seedBytes);
+    const seed = bytesToHex(seedBytes);
 
     const keyHex = await this.computeDelay(seed, iterations, progressCallback);
     const { encryptedData } = await this.crypt.encrypt(content, keyHex);

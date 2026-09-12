@@ -127,72 +127,83 @@ export async function fetchEngines(force = false): Promise<boolean> {
       return lower === `${targetAsset.name.toLowerCase()}.sha256` || lower.includes('checksum') || lower.includes('sha256sum') || lower === 'sha256.txt';
     });
 
-    if (checksumAsset) {
-      const provSpinner = ora(chalk.blue(`Verifying SHA-256 against release manifest (${checksumAsset.name})...`)).start();
-      let csRes = await fetch(checksumAsset.browser_download_url, { headers });
-      if (csRes.status === 401 && headers['Authorization']) {
-        delete headers['Authorization'];
-        csRes = await fetch(checksumAsset.browser_download_url, { headers });
-      }
-      if (csRes.ok) {
-        const checksumText = await csRes.text();
-        let expectedHash: string | null = null;
-        const lines = checksumText.split(/\r?\n/);
-        for (const line of lines) {
-          if (line.includes(targetAsset.name)) {
-            const match = line.match(/[a-fA-F0-9]{64}/);
-            if (match) {
-              expectedHash = match[0].toLowerCase();
-              break;
-            }
-          }
-        }
-        if (!expectedHash && checksumAsset.name.toLowerCase().includes(targetAsset.name.toLowerCase())) {
-          const match = checksumText.match(/[a-fA-F0-9]{64}/);
-          if (match) expectedHash = match[0].toLowerCase();
-        }
+    if (!checksumAsset) {
+      throw new Error(`Mandatory provenance failed: no SHA-256 checksum manifest found in release ${release.tag_name}. Unverified native engines are rejected by enclave security policy.`);
+    }
 
-        if (expectedHash) {
-          if (computedHash !== expectedHash) {
-            provSpinner.fail(chalk.red(`Provenance Failure: SHA-256 mismatch for ${targetAsset.name}!`));
-            throw new Error(`Expected SHA-256: ${expectedHash}, computed: ${computedHash}`);
-          }
-          provSpinner.succeed(chalk.green(`SHA-256 verified (${computedHash.slice(0, 16)}...)`));
+    const provSpinner = ora(chalk.blue(`Verifying SHA-256 against release manifest (${checksumAsset.name})...`)).start();
+    let csRes = await fetch(checksumAsset.browser_download_url, { headers });
+    if (csRes.status === 401 && headers['Authorization']) {
+      delete headers['Authorization'];
+      csRes = await fetch(checksumAsset.browser_download_url, { headers });
+    }
+    if (!csRes.ok) {
+      provSpinner.fail(chalk.red(`Failed to download checksum manifest: ${csRes.statusText}`));
+      throw new Error(`Failed to download checksum manifest ${checksumAsset.name}: ${csRes.statusText}`);
+    }
 
-          // Look for digital signature
-          const signatureAsset = release.assets.find((a) => {
-            const lower = a.name.toLowerCase();
-            return (
-              lower === `${checksumAsset.name.toLowerCase()}.sig` ||
-              lower === `${targetAsset.name.toLowerCase()}.sig` ||
-              lower.includes('checksums.txt.sig') ||
-              lower.includes('sha256sums.sig') ||
-              lower.includes('manifest.sig')
-            );
-          });
-
-          if (signatureAsset) {
-            const sigSpinner = ora(chalk.blue(`Authenticating release signature via Darkstar Trust Anchor (${signatureAsset.name})...`)).start();
-            let sigRes = await fetch(signatureAsset.browser_download_url, { headers });
-            if (sigRes.status === 401 && headers['Authorization']) {
-              delete headers['Authorization'];
-              sigRes = await fetch(signatureAsset.browser_download_url, { headers });
-            }
-            if (sigRes.ok) {
-              const sigContent = await sigRes.text();
-              const isSigValid = verifyEd25519Signature(checksumText, sigContent);
-              if (!isSigValid) {
-                sigSpinner.fail(chalk.red(`Signature verification failed: invalid signature against Darkstar Trust Anchor!`));
-                throw new Error(`Release signature in ${signatureAsset.name} failed verification!`);
-              }
-              sigSpinner.succeed(chalk.green('Release manifest authenticated via Darkstar Ed25519 Trust Anchor.'));
-            }
-          }
-        } else {
-          provSpinner.warn(chalk.yellow(`Checksum manifest did not contain entry for ${targetAsset.name}.`));
+    const checksumText = await csRes.text();
+    let expectedHash: string | null = null;
+    const lines = checksumText.split(/\r?\n/);
+    for (const line of lines) {
+      if (line.includes(targetAsset.name)) {
+        const match = line.match(/[a-fA-F0-9]{64}/);
+        if (match) {
+          expectedHash = match[0].toLowerCase();
+          break;
         }
       }
     }
+    if (!expectedHash && checksumAsset.name.toLowerCase().includes(targetAsset.name.toLowerCase())) {
+      const match = checksumText.match(/[a-fA-F0-9]{64}/);
+      if (match) expectedHash = match[0].toLowerCase();
+    }
+
+    if (!expectedHash) {
+      provSpinner.fail(chalk.red(`Checksum manifest did not contain explicit entry for ${targetAsset.name}.`));
+      throw new Error(`Mandatory provenance failed: checksum manifest did not contain entry for ${targetAsset.name}.`);
+    }
+
+    if (computedHash !== expectedHash) {
+      provSpinner.fail(chalk.red(`Provenance Failure: SHA-256 mismatch for ${targetAsset.name}!`));
+      throw new Error(`Expected SHA-256: ${expectedHash}, computed: ${computedHash}`);
+    }
+    provSpinner.succeed(chalk.green(`SHA-256 verified (${computedHash.slice(0, 16)}...)`));
+
+    // Mandatory digital signature verification
+    const signatureAsset = release.assets.find((a) => {
+      const lower = a.name.toLowerCase();
+      return (
+        lower === `${checksumAsset.name.toLowerCase()}.sig` ||
+        lower === `${targetAsset.name.toLowerCase()}.sig` ||
+        lower.includes('checksums.txt.sig') ||
+        lower.includes('sha256sums.sig') ||
+        lower.includes('manifest.sig')
+      );
+    });
+
+    if (!signatureAsset) {
+      throw new Error(`Mandatory provenance failed: no cryptographic digital signature (.sig) found for release ${release.tag_name}. Unsigned native engines are rejected by enclave security policy.`);
+    }
+
+    const sigSpinner = ora(chalk.blue(`Authenticating release signature via Darkstar Trust Anchor (${signatureAsset.name})...`)).start();
+    let sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+    if (sigRes.status === 401 && headers['Authorization']) {
+      delete headers['Authorization'];
+      sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+    }
+    if (!sigRes.ok) {
+      sigSpinner.fail(chalk.red(`Failed to download release signature: ${sigRes.statusText}`));
+      throw new Error(`Failed to download release signature ${signatureAsset.name}: ${sigRes.statusText}`);
+    }
+
+    const sigContent = await sigRes.text();
+    const isSigValid = verifyEd25519Signature(checksumText, sigContent);
+    if (!isSigValid) {
+      sigSpinner.fail(chalk.red(`Signature verification failed: invalid signature against Darkstar Trust Anchor!`));
+      throw new Error(`Release signature in ${signatureAsset.name} failed verification!`);
+    }
+    sigSpinner.succeed(chalk.green('Release manifest authenticated via Darkstar Ed25519 Trust Anchor.'));
 
     fs.writeFileSync(archivePath, fileBuffer);
     downloadSpinner.succeed(chalk.green(`Downloaded & verified ${targetAsset.name}`));
@@ -246,11 +257,20 @@ export async function fetchEngines(force = false): Promise<boolean> {
   } catch (err: unknown) {
     spinner.fail(chalk.red('Failed to obtain native engine from releases.'));
     console.error(chalk.dim((err as Error).message));
+    // Fail-closed: clean up any dangling partial downloads or unverified files
+    try {
+      const tempArchives = fs.readdirSync(binDir).filter((f) => f.endsWith('.zip') || f.endsWith('.tar.gz') || f.endsWith('.tmp'));
+      for (const tempArchive of tempArchives) {
+        fs.unlinkSync(path.join(binDir, tempArchive));
+      }
+    } catch {
+      /* ignore */
+    }
     console.log(chalk.yellow('\nManual installation instructions:'));
     console.log(chalk.dim(`  1. Visit: ${chalk.underline('https://github.com/Kryklin/darkstar/releases')}`));
     console.log(chalk.dim(`  2. Download the appropriate engine zip for your OS.`));
     console.log(chalk.dim(`  3. Extract d-arx-512${ext} into: ${chalk.yellow(binDir)}`));
-    console.log(chalk.dim(`  4. Or set DARKSTAR_ENGINE_PATH in .env to the executable path.\n`));
+    console.log(chalk.dim(`  4. In development, you may set DARKSTAR_ENGINE_PATH in .env to the executable path.\n`));
     return false;
   }
 }

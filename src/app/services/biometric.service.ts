@@ -35,41 +35,22 @@ export class BiometricService {
 
   /**
    * Prompts the user for biometric authentication (Windows Hello / TouchID).
-   * Uses WebAuthn "Conditional UI" or standard assertion if possible.
-   * Note: For standard unlock, we mostly care about "User Verification".
+   * Uses WebAuthn standard assertion with a fresh 32-byte challenge and enrolled public key.
    */
-  async authenticate(challengeStr = 'darkstar-auth'): Promise<boolean> {
+  async authenticate(challengeParam?: Uint8Array): Promise<boolean> {
     if (!this.isAvailable()) return false;
 
     try {
-      // Challenge must be a buffer
-      const challenge = Uint8Array.from(challengeStr, (c) => c.charCodeAt(0));
+      // Generate fresh 32-byte cryptographically random challenge to prevent replay attacks
+      const challenge = challengeParam || window.crypto.getRandomValues(new Uint8Array(32));
 
-      const publicKey: PublicKeyCredentialRequestOptions = {
-        challenge,
+      const publicKey: PublicKeyCredentialRequestOptions & { credentialPublicKey?: string } = {
+        challenge: challenge as unknown as BufferSource,
         timeout: 60000,
         rpId: 'localhost', // Explicit RP ID for custom protocol support
         userVerification: 'required', // This forces Windows Hello / TouchID
-        // We allow any credential since we are just checking for presence/verification
-        // proof of the current platform user, not necessarily a specific registered key
-        // (unless we implement full registration flow).
-        // For simple local app unlock, often just proving UV (User Verified) is treated as success
-        // if the OS enforces it.
       };
 
-      // NOTE: In a real "Hardware Key" flow we would match against registered IDs.
-      // For "Windows Hello" local unlock without backend, we typically need to register a credential first
-      // to reuse it. However, to keep it simple for v1, we attempting a generic check.
-      // BUT: WebAuthn require allowCredentials to be empty only for discoverable credentials.
-
-      // Let's rely on a simplified 'verifyUser' approach if we can, or we implement full registration.
-      // For now, let's assume we need to Register first.
-      // So we will add a register method.
-
-      // To strictly answer "Unlock", we usually need a stored credential ID.
-      // Let's try to find one.
-      // To strictly answer "Unlock", we usually need a stored credential ID.
-      // Let's try to find one.
       const biometricId = localStorage.getItem('biometric_credential_id');
       const hardwareId = localStorage.getItem('hardware_key_credential_id');
 
@@ -94,6 +75,13 @@ export class BiometricService {
         publicKey.allowCredentials = allowScientificCredentials;
       } else {
         return false;
+      }
+
+      // Attach registered credential public key for cryptographic signature verification
+      const pubKeyStorageKey = biometricId ? 'biometric_public_key' : 'hardware_key_public_key';
+      const storedPubKey = localStorage.getItem(pubKeyStorageKey);
+      if (storedPubKey) {
+        publicKey.credentialPublicKey = storedPubKey;
       }
 
       // NATIVE PROXY: Use Electron's native handshake proxy if available to bypass scheme restrictions
@@ -153,13 +141,20 @@ export class BiometricService {
         timeout: 60000,
       };
 
+      const storageKey = attachment === 'platform' ? 'biometric_credential_id' : 'hardware_key_credential_id';
+      const pubKeyStorageKey = attachment === 'platform' ? 'biometric_public_key' : 'hardware_key_public_key';
+
       // NATIVE PROXY: Use Electron's native handshake proxy for registration
       if (window.electronAPI && window.electronAPI.biometricHandshake) {
         const response = await window.electronAPI.biometricHandshake({ action: 'create', publicKey });
         if (response.success && response.data) {
-          const base64Id = this.Uint8ArrayToBase64(new Uint8Array(response.data.rawId));
-          const storageKey = attachment === 'platform' ? 'biometric_credential_id' : 'hardware_key_credential_id';
+          const rawId = response.data['rawId'] as ArrayLike<number>;
+          const base64Id = this.Uint8ArrayToBase64(new Uint8Array(rawId));
           localStorage.setItem(storageKey, base64Id);
+          const rawPubKey = response.data['publicKey'] as ArrayLike<number> | undefined;
+          if (rawPubKey) {
+            localStorage.setItem(pubKeyStorageKey, this.Uint8ArrayToBase64(new Uint8Array(rawPubKey)));
+          }
           return true;
         }
         return false;
@@ -170,9 +165,15 @@ export class BiometricService {
       if (credential) {
         const rawId = credential.rawId;
         const base64Id = this.arrayBufferToBase64(rawId);
-
-        const storageKey = attachment === 'platform' ? 'biometric_credential_id' : 'hardware_key_credential_id';
         localStorage.setItem(storageKey, base64Id);
+
+        const attestationResponse = credential.response as AuthenticatorAttestationResponse;
+        if (attestationResponse && typeof attestationResponse.getPublicKey === 'function') {
+          const pubKeyBuf = attestationResponse.getPublicKey();
+          if (pubKeyBuf) {
+            localStorage.setItem(pubKeyStorageKey, this.arrayBufferToBase64(pubKeyBuf));
+          }
+        }
 
         return true;
       }

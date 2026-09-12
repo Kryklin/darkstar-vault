@@ -4,10 +4,21 @@ import { app, dialog } from 'electron';
 import * as path from 'path';
 import { DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, verifyEd25519Signature } from './trust-anchor';
 
+let integrityVerifiedState: boolean | null = null;
+
+export function isIntegrityVerified(): boolean {
+  if (integrityVerifiedState !== null) {
+    return integrityVerifiedState;
+  }
+  // In unpacked development mode, integrity check is skipped unless forced
+  return !app.isPackaged;
+}
+
 export async function verifyIntegrity(): Promise<void> {
   // Only verify in packaged mode to avoid friction during development Watch mode
   // where files update incrementally.
   if (!app.isPackaged && !process.env['FORCE_INTEGRITY_CHECK']) {
+    integrityVerifiedState = true;
     return;
   }
 
@@ -51,8 +62,10 @@ export async function verifyIntegrity(): Promise<void> {
         throw new Error(`Integrity check failed for ${file}. Expected: ${expectedHash}, Actual: ${actualHash}`);
       }
     }
+    integrityVerifiedState = true;
     console.log('[Anti-Tamper] All runtime bundles match authenticated integrity manifest.');
   } catch (error: unknown) {
+    integrityVerifiedState = false;
     console.error('Anti-Tamper: Integrity check failed!', error);
     dialog.showErrorBox(
       'Security Alert: Integrity Verification Failed',
