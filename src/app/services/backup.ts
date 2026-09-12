@@ -1,9 +1,12 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, effect, inject } from '@angular/core';
+import { VaultService } from './vault';
 
 @Injectable({
   providedIn: 'root',
 })
 export class BackupService {
+  private vaultService = inject(VaultService);
+
   enabled = signal<boolean>(localStorage.getItem('backup_enabled') === 'true');
   intervalDays = signal<number>(parseInt(localStorage.getItem('backup_interval_days') || '7', 10));
   lastBackupDate = signal<Date | null>(localStorage.getItem('backup_last_date') ? new Date(localStorage.getItem('backup_last_date')!) : null);
@@ -124,10 +127,16 @@ export class BackupService {
         return { success: false, message: 'Corrupt backup envelope: invalid safeStorage flag.' };
       }
 
-      // 4. Inject
+      // 4. Cryptographic trial decryption and payload validation
+      const validation = await this.vaultService.validateBackupPayload(backupData);
+      if (!validation.valid) {
+        return { success: false, message: validation.error || 'Cryptographic authentication of backup payload failed.' };
+      }
+
+      // 5. Inject authenticated state
       localStorage.setItem('darkstar_vault', backupData);
 
-      // 5. Force reload
+      // 6. Force reload
       window.location.reload();
 
       // Technically won't reach here if reload succeeds instantly

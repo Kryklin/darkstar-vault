@@ -11,6 +11,7 @@ import { machineIdSync } from 'node-machine-id';
 import squirrelStartup from 'electron-squirrel-startup';
 import { authenticator } from 'otplib';
 import { verifyIntegrity } from './integrity';
+import { DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, verifyEd25519Signature } from './trust-anchor';
 
 const execFileAsync = promisify(execFile);
 
@@ -633,6 +634,35 @@ async function fetchEngineFromReleases(): Promise<string> {
           throw new Error(`Provenance verification failed: SHA-256 checksum mismatch for ${targetAsset.name}!\n` + `Expected: ${expectedHash}\n` + `Computed: ${computedHash}`);
         }
         console.log(`[Darkstar Engine] Cryptographic provenance verified: SHA-256 matches manifest (${computedHash}).`);
+
+        // Check for an accompanying digital signature for the checksum manifest
+        const signatureAsset = release.assets.find((a) => {
+          const lower = a.name.toLowerCase();
+          return (
+            lower === `${checksumAsset.name.toLowerCase()}.sig` ||
+            lower === `${targetAsset.name.toLowerCase()}.sig` ||
+            lower.includes('checksums.txt.sig') ||
+            lower.includes('sha256sums.sig') ||
+            lower.includes('manifest.sig')
+          );
+        });
+
+        if (signatureAsset) {
+          console.log(`[Darkstar Engine] Authenticating release digital signature: ${signatureAsset.name}...`);
+          let sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+          if (sigRes.status === 401 && headers['Authorization']) {
+            delete headers['Authorization'];
+            sigRes = await fetch(signatureAsset.browser_download_url, { headers });
+          }
+          if (sigRes.ok) {
+            const sigContent = await sigRes.text();
+            const isSigValid = verifyEd25519Signature(checksumText, sigContent, DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY);
+            if (!isSigValid) {
+              throw new Error(`Provenance verification failed: Release signature in ${signatureAsset.name} is invalid against the Darkstar Trust Anchor!`);
+            }
+            console.log('[Darkstar Engine] Cryptographic release provenance verified via Ed25519 digital signature.');
+          }
+        }
       } else {
         console.warn(`[Darkstar Engine] Checksum manifest did not contain explicit entry for ${targetAsset.name}.`);
       }
@@ -945,6 +975,45 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
       const resultHandler = async (_: unknown, response: { success: boolean; data?: unknown; error?: string }) => {
         ipcMain.removeListener('handshake-result', resultHandler);
         cleanup();
+
+        // Native process assertion verification for 'get' action
+        if (options.action === 'get' && response.success && response.data) {
+          const respData = response.data as {
+            response?: {
+              clientDataJSON?: number[];
+              authenticatorData?: number[];
+              signature?: number[];
+            };
+          };
+          const clientDataArr = respData.response?.clientDataJSON;
+          const authDataArr = respData.response?.authenticatorData;
+          const sigArr = respData.response?.signature;
+
+          if (!clientDataArr || !authDataArr || !sigArr || authDataArr.length < 37 || sigArr.length === 0) {
+            return resolve({ success: false, error: 'Native verification failed: malformed WebAuthn assertion structure.' });
+          }
+
+          try {
+            const clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
+            if (clientDataJson.type !== 'webauthn.get') {
+              return resolve({ success: false, error: 'Native verification failed: assertion type mismatch.' });
+            }
+          } catch {
+            return resolve({ success: false, error: 'Native verification failed: invalid clientDataJSON.' });
+          }
+
+          // Check flags at byte 32: bit 0 (UP), bit 2 (UV)
+          const flags = authDataArr[32];
+          const userPresent = (flags & 0x01) !== 0;
+          const userVerified = (flags & 0x04) !== 0;
+          if (!userPresent || !userVerified) {
+            return resolve({
+              success: false,
+              error: 'Native verification failed: authenticator did not assert User Verification (UV flag).',
+            });
+          }
+        }
+
         resolve(response);
       };
       ipcMain.on('handshake-result', resultHandler);

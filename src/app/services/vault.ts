@@ -225,6 +225,47 @@ export class VaultService {
     }
   }
 
+  async validateBackupPayload(backupData: string, passwordOverride?: string): Promise<{ valid: boolean; error?: string }> {
+    try {
+      const envelope: VaultStorage = JSON.parse(backupData);
+      if (!envelope || typeof envelope.data !== 'string' || envelope.data.trim().length === 0) {
+        return { valid: false, error: 'Malformed backup envelope: missing encrypted data payload.' };
+      }
+
+      const keyToUse = passwordOverride || this.masterKey();
+      if (!keyToUse) {
+        return { valid: true };
+      }
+
+      let encryptedData = envelope.data;
+      if (envelope.s && window.electronAPI) {
+        encryptedData = await window.electronAPI.safeStorageDecrypt(encryptedData);
+      }
+
+      const { skHex } = await this.derivePqcKeys(keyToUse);
+      const res = await this.crypt.decrypt(encryptedData, '', skHex, this.hardwareId() || undefined);
+      const jsonStr = res.decrypted;
+      if (!jsonStr) {
+        return { valid: false, error: 'Cryptographic authentication failed: master key does not match backup ciphertext.' };
+      }
+
+      let parsed: VaultContent;
+      if (typeof jsonStr === 'object') {
+        parsed = jsonStr as unknown as VaultContent;
+      } else {
+        parsed = JSON.parse(jsonStr);
+      }
+
+      if (!parsed || (parsed.notes && !Array.isArray(parsed.notes))) {
+        return { valid: false, error: 'Corrupt backup content: invalid notes structure in decrypted payload.' };
+      }
+
+      return { valid: true };
+    } catch (e: unknown) {
+      return { valid: false, error: `Cryptographic validation failed: ${(e as Error).message}` };
+    }
+  }
+
   // Biometric and Hardware Key Integration
 
   async registerBiometricsForSession(password: string): Promise<boolean> {
