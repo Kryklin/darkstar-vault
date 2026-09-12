@@ -48,7 +48,7 @@ If you discover an architectural weakness, memory leakage vector, or cryptograph
 **<kalemslight@gmail.com>**  
 *(Alternative security point of contact: `<mortalpain1@gmail.com>`)*
 
-### What to include in your advisory:
+### What to include in your advisory
 
 1. **Vulnerability Overview**: Clear description of the exploit vector and severity assessment.
 2. **Reproduction Steps**: Step-by-step instructions or minimal Proof of Concept (PoC).

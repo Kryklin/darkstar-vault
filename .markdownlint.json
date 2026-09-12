@@ -1,7 +1,21 @@
 {
   "default": true,
+  "MD013": false,
   "MD033": {
-    "allowed_elements": ["p", "picture", "source", "img", "h1", "h2"]
+    "allowed_elements": [
+      "p",
+      "div",
+      "picture",
+      "source",
+      "img",
+      "h1",
+      "h2",
+      "a",
+      "br",
+      "sub",
+      "sup",
+      "span"
+    ]
   },
   "MD041": false
 }
