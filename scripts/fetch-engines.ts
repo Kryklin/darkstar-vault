@@ -38,16 +38,21 @@ export async function fetchEngines(force = false): Promise<boolean> {
   const rustBin = path.join(binDir, `d-arx-512${ext}`);
   const arxAlias = path.join(binDir, `d-arx${ext}`);
 
-  // If binaries already exist and force flag is not passed, verify and exit early
+  // If binaries already exist and force flag is not passed, verify against manifest and exit early
   if (!force && (fs.existsSync(rustBin) || fs.existsSync(arxAlias))) {
     const activeBin = fs.existsSync(rustBin) ? rustBin : arxAlias;
     const spinner = ora(chalk.blue(`Verifying existing crypto engine at ${activeBin}...`)).start();
     try {
+      const manifest = loadAuthenticatedEngineManifest();
+      const verifyResult = await verifyEngineBinary(activeBin, manifest);
+      if (!verifyResult.valid) {
+        throw new Error(`Engine manifest verification failed: ${verifyResult.error}`);
+      }
       execSync(`"${activeBin}" test`, { stdio: 'pipe' });
-      spinner.succeed(chalk.green(`Engine verified & operational: ${activeBin}`));
+      spinner.succeed(chalk.green(`Engine verified & operational against Authenticated Manifest: ${activeBin}`));
       console.log(chalk.gray('  Status: Ready for local encryption & testing.\n'));
       return true;
-    } catch {
+    } catch (_verifyErr: unknown) {
       spinner.warn(chalk.yellow('Existing engine failed verification. Re-downloading from releases...'));
     }
   }
@@ -216,7 +221,11 @@ export async function fetchEngines(force = false): Promise<boolean> {
         if (fs.existsSync(isolatedArchive)) fs.unlinkSync(isolatedArchive);
         extractSpinner.succeed(chalk.green('Archive extracted via PowerShell.'));
       } catch (psErr: unknown) {
-        try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        try {
+          fs.rmSync(isolatedTempDir, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
         throw new Error(`Extraction failed: ${(psErr as Error).message}`);
       }
     }
@@ -226,7 +235,11 @@ export async function fetchEngines(force = false): Promise<boolean> {
     const stagedActive = fs.existsSync(stagedRustBin) ? stagedRustBin : stagedArxAlias;
 
     if (!fs.existsSync(stagedActive)) {
-      try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(isolatedTempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
       throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-arx${ext} found in staging directory.`);
     }
 
@@ -236,7 +249,11 @@ export async function fetchEngines(force = false): Promise<boolean> {
     const verifyResult = await verifyEngineBinary(stagedActive, manifest);
     if (!verifyResult.valid) {
       manifestSpinner.fail(chalk.red(`Engine manifest verification FAILED: ${verifyResult.error}`));
-      try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(isolatedTempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
       throw new Error(`Engine verification failed: ${verifyResult.error}`);
     }
     manifestSpinner.succeed(chalk.green(`Engine binary SHA-256 and size verified against Authenticated Manifest.`));
@@ -248,7 +265,11 @@ export async function fetchEngines(force = false): Promise<boolean> {
       testSpinner.succeed(chalk.green('Engine self-test PASSED! Cryptographic engine is operational.'));
     } catch (testErr: unknown) {
       testSpinner.fail(chalk.red(`Cryptographic engine self-test FAILED: ${(testErr as Error).message}`));
-      try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(isolatedTempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
       return false;
     }
 
@@ -270,7 +291,9 @@ export async function fetchEngines(force = false): Promise<boolean> {
       try {
         if (fs.existsSync(rustBin)) fs.unlinkSync(rustBin);
         if (fs.existsSync(arxAlias)) fs.unlinkSync(arxAlias);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       throw new Error(`Post-installation trust check failed: ${postVerify.error}`);
     }
 

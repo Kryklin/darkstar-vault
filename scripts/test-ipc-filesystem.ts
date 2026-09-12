@@ -104,10 +104,10 @@ async function runTests() {
   const mockWindow = {} as BrowserWindow;
   const mockLookup = (contents: unknown) => (contents ? mockWindow : null);
 
-  // Production mode: app: protocol
+  // Production mode: exact app://localhost origin
   const validProdEvent = {
-    sender: { getURL: () => 'app://index.html' },
-    senderFrame: { url: 'app://index.html' },
+    sender: { getURL: () => 'app://localhost/index.html' },
+    senderFrame: { url: 'app://localhost/index.html' },
   };
   let ipcThrew = false;
   try {
@@ -115,7 +115,24 @@ async function runTests() {
   } catch {
     ipcThrew = true;
   }
-  assert(!ipcThrew, 'Test 18: app: origin accepted in production');
+  assert(!ipcThrew, 'Test 18: app://localhost origin accepted in production');
+
+  // Disallowed app: subdomains, arbitrary hosts, or ports in production
+  const disallowedAppEvents = [
+    { name: 'app://index.html without localhost host', url: 'app://index.html' },
+    { name: 'app://evil.com arbitrary host', url: 'app://evil.com/index.html' },
+    { name: 'app://localhost:8080 non-empty port', url: 'app://localhost:8080/index.html' },
+  ];
+  for (const item of disallowedAppEvents) {
+    const evt = { sender: { getURL: () => item.url }, senderFrame: { url: item.url } };
+    ipcThrew = false;
+    try {
+      assertValidIpcSender(evt as never, mockLookup, true);
+    } catch {
+      ipcThrew = true;
+    }
+    assert(ipcThrew, `Test 18b: Disallowed origin rejected in prod: ${item.name}`);
+  }
 
   // Dev mode: localhost:4200 allowed
   const validDevEvent = {

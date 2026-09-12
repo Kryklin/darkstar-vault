@@ -108,18 +108,7 @@ export function decodeCbor(buf: Buffer, offset = 0): { val: unknown; offset: num
  * ONLY after persistent storage succeeds.
  */
 export async function enrollWebAuthnCredential(params: WebAuthnEnrollmentParams): Promise<WebAuthnEnrollmentResult> {
-  const {
-    rawId,
-    publicKey,
-    clientDataJSON,
-    attestationObject,
-    authenticatorData,
-    expectedOrigin,
-    expectedRpId = 'localhost',
-    expectedChallenge,
-    registry,
-    onPersistRegistry,
-  } = params;
+  const { rawId, publicKey, clientDataJSON, attestationObject, authenticatorData, expectedOrigin, expectedRpId = 'localhost', expectedChallenge, registry, onPersistRegistry } = params;
 
   if (!clientDataJSON || !rawId) {
     return { success: false, error: 'Native enrollment failed: malformed WebAuthn attestation structure.' };
@@ -160,19 +149,36 @@ export async function enrollWebAuthnCredential(params: WebAuthnEnrollmentParams)
   }
 
   // 2. Extract and authenticate authData
-  let authData: Buffer | null = null;
-  if (authenticatorData) {
-    authData = Buffer.from(authenticatorData);
-  } else if (attestationObject) {
+  let authDataFromAtt: Buffer | null = null;
+  if (attestationObject) {
     try {
       const attObjBuf = Buffer.from(attestationObject);
       const decodedAtt = decodeCbor(attObjBuf).val as Map<unknown, unknown>;
       const extracted = decodedAtt.get('authData');
       if (Buffer.isBuffer(extracted) || extracted instanceof Uint8Array) {
-        authData = Buffer.from(extracted);
+        authDataFromAtt = Buffer.from(extracted);
+      } else {
+        return { success: false, error: 'Native enrollment failed: attestationObject missing authData field.' };
       }
     } catch (cborErr) {
       return { success: false, error: `Native enrollment failed: invalid attestationObject CBOR: ${(cborErr as Error).message}` };
+    }
+  }
+
+  let authData: Buffer | null = authDataFromAtt;
+
+  if (authenticatorData) {
+    const directAuthData = Buffer.from(authenticatorData);
+    if (authDataFromAtt) {
+      // Both supplied: require byte-for-byte timing-safe equality
+      if (directAuthData.length !== authDataFromAtt.length || !crypto.timingSafeEqual(directAuthData, authDataFromAtt)) {
+        return {
+          success: false,
+          error: 'Native enrollment failed: authenticatorData does not match authData in attestationObject.',
+        };
+      }
+    } else {
+      authData = directAuthData;
     }
   }
 
@@ -289,17 +295,7 @@ export async function enrollWebAuthnCredential(params: WebAuthnEnrollmentParams)
  * In-memory state mutation is committed ONLY after persistent storage succeeds.
  */
 export async function verifyWebAuthnAssertion(params: WebAuthnAssertionParams): Promise<WebAuthnAssertionResult> {
-  const {
-    rawId,
-    clientDataJSON,
-    authenticatorData,
-    signature,
-    expectedOrigin,
-    expectedRpId = 'localhost',
-    expectedChallenge,
-    registry,
-    onPersistRegistry,
-  } = params;
+  const { rawId, clientDataJSON, authenticatorData, signature, expectedOrigin, expectedRpId = 'localhost', expectedChallenge, registry, onPersistRegistry } = params;
 
   // 1. Structure validation
   if (!clientDataJSON || !authenticatorData || !signature) {

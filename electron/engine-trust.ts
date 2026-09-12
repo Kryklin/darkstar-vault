@@ -53,10 +53,7 @@ export function canonicalizeEngineManifest(payload: EngineManifestPayload): stri
 /**
  * Cryptographically verifies an Engine Manifest against the embedded Ed25519 Trust Anchor.
  */
-export function verifyEngineManifestSignature(
-  manifest: EngineManifest,
-  trustAnchorPublicKeyPem: string = DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY
-): boolean {
+export function verifyEngineManifestSignature(manifest: EngineManifest, trustAnchorPublicKeyPem: string = DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY): boolean {
   if (!manifest || !manifest.signature || !Array.isArray(manifest.engines)) {
     return false;
   }
@@ -140,7 +137,7 @@ export async function verifyEngineBinary(
     expectedPlatform?: string;
     expectedArch?: string;
     trustAnchorPem?: string;
-  } = {}
+  } = {},
 ): Promise<EngineVerificationResult> {
   const targetPlatform = options.expectedPlatform || process.platform;
   const targetArch = options.expectedArch || process.arch;

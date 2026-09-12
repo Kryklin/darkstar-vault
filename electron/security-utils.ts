@@ -41,15 +41,34 @@ export function sanitizeVaultFilename(filename: unknown): string {
 }
 
 /**
+ * Strict origin validator enforcing exact application origin:
+ * - Production: app://localhost (host must be 'localhost', port must be empty)
+ * - Development: http://localhost:4200 or http://127.0.0.1:4200
+ */
+export function isAllowedOrigin(urlStr: string, isPackaged: boolean): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    // Strict production origin: app://localhost exactly (hostname and host must be 'localhost', no port)
+    if (parsed.protocol === 'app:' && parsed.hostname === 'localhost' && parsed.host === 'localhost' && parsed.port === '') {
+      return true;
+    }
+    // Strict dev server origin: http://localhost:4200 or http://127.0.0.1:4200
+    if (!isPackaged && parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && parsed.port === '4200') {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates that an incoming IPC invocation originated from a trusted internal frame.
- * For production, the origin must be 'app:' or 'app://...'.
+ * For production, the origin must be exactly 'app://localhost'.
  * For development, 'http://localhost:4200' is permitted.
  */
-export function assertValidIpcSender(
-  event: IpcMainInvokeEvent | IpcMainEvent,
-  browserWindowLookup: (webContents: any) => BrowserWindowType | null,
-  isPackaged: boolean
-): void {
+export function assertValidIpcSender(event: IpcMainInvokeEvent | IpcMainEvent, browserWindowLookup: (webContents: any) => BrowserWindowType | null, isPackaged: boolean): void {
   const senderWebContents = event.sender;
   if (!senderWebContents) {
     throw new Error('IPC Security Violation: Sender webContents is missing.');
@@ -64,16 +83,8 @@ export function assertValidIpcSender(
     throw new Error('IPC Security Violation: Sender frame URL is missing.');
   }
 
-  try {
-    const parsed = new URL(frameUrl);
-    if (parsed.protocol === 'app:') {
-      return;
-    }
-    if (!isPackaged && parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && parsed.port === '4200') {
-      return;
-    }
-  } catch {
-    throw new Error('IPC Security Violation: Malformed sender frame URL.');
+  if (isAllowedOrigin(frameUrl, isPackaged)) {
+    return;
   }
 
   throw new Error(`IPC Security Violation: Disallowed sender origin: ${frameUrl}`);

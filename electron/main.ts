@@ -40,10 +40,9 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Cross-Origin-Opener-Policy': 'same-origin',
 };
 
-import { isPathContained, sanitizeVaultFilename, assertValidIpcSender as assertValidIpcSenderUtil } from './security-utils';
+import { isPathContained, sanitizeVaultFilename, assertValidIpcSender as assertValidIpcSenderUtil, isAllowedOrigin } from './security-utils';
 
-const assertValidIpcSender = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) =>
-  assertValidIpcSenderUtil(event, BrowserWindow.fromWebContents, app.isPackaged);
+const assertValidIpcSender = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => assertValidIpcSenderUtil(event, BrowserWindow.fromWebContents, app.isPackaged);
 
 let updaterInitialized = false;
 let isVersionLocked = false;
@@ -134,10 +133,7 @@ function createWindow() {
   });
 
   win.webContents.on('will-navigate', (event, navigationUrl) => {
-    const parsed = new URL(navigationUrl);
-    const isAppOrigin = parsed.protocol === 'app:';
-    const isDevOrigin = !app.isPackaged && (parsed.origin === 'http://localhost:4200' || parsed.origin === 'ws://localhost:4200');
-    if (!isAppOrigin && !isDevOrigin) {
+    if (!isAllowedOrigin(navigationUrl, app.isPackaged)) {
       event.preventDefault();
       if (navigationUrl.startsWith('https:') || navigationUrl.startsWith('http:')) {
         shell.openExternal(navigationUrl);
@@ -223,7 +219,22 @@ function createTray() {
   });
 }
 
+async function cleanEngineRuntime(): Promise<void> {
+  try {
+    const runtimeDir = path.join(app.getPath('userData'), '.engine_runtime');
+    const files = await fs.readdir(runtimeDir);
+    for (const file of files) {
+      const p = path.join(runtimeDir, file);
+      await fs.chmod(p, 0o700).catch(() => {});
+      await fs.unlink(p).catch(() => {});
+    }
+  } catch {
+    // Directory may not exist yet; ignore
+  }
+}
+
 app.whenReady().then(async () => {
+  await cleanEngineRuntime();
   protocol.handle('app', async (request) => {
     const url = new URL(request.url);
     let pathname = url.pathname;
@@ -309,6 +320,10 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  cleanEngineRuntime().catch(() => {});
 });
 
 ipcMain.on('minimize-window', (event) => {
@@ -953,15 +968,30 @@ async function runDArxCommand(args: string[]): Promise<unknown> {
     );
   }
 
-  // Cryptographic Engine Trust Verification against Authenticated Manifest
-  const manifest = loadAuthenticatedEngineManifest();
-  const verifyRes = await verifyEngineBinary(foundBinary, manifest);
-  if (!verifyRes.valid) {
-    throw new Error(`Engine Execution Blocked: Binary at ${foundBinary} failed cryptographic trust verification:\n${verifyRes.error}`);
-  }
+  // Mitigate TOCTOU race condition: Stage executable into an isolated runtime directory,
+  // set strict permissions, verify the exact staged artifact against authenticated manifest,
+  // and execute that identical staged copy.
+  const runtimeDir = path.join(app.getPath('userData'), '.engine_runtime');
+  await fs.mkdir(runtimeDir, { recursive: true, mode: 0o700 });
+  const stagedToken = crypto.randomBytes(16).toString('hex');
+  const stagedBinaryPath = path.join(runtimeDir, `d-arx_${stagedToken}${ext}`);
 
   try {
-    const { stdout } = await execFileAsync(foundBinary, args);
+    await fs.copyFile(foundBinary, stagedBinaryPath);
+    try {
+      await fs.chmod(stagedBinaryPath, 0o500);
+    } catch {
+      // Best-effort permission lockdown
+    }
+
+    // Cryptographic Engine Trust Verification against Authenticated Manifest on the staged copy
+    const manifest = loadAuthenticatedEngineManifest();
+    const verifyRes = await verifyEngineBinary(stagedBinaryPath, manifest);
+    if (!verifyRes.valid) {
+      throw new Error(`Engine Execution Blocked: Staged binary failed cryptographic trust verification:\n${verifyRes.error}`);
+    }
+
+    const { stdout } = await execFileAsync(stagedBinaryPath, args);
     try {
       return JSON.parse(stdout);
     } catch {
@@ -970,15 +1000,22 @@ async function runDArxCommand(args: string[]): Promise<unknown> {
   } catch (e: unknown) {
     const err = e as Error & { stderr?: string };
     throw new Error(`D-ARX Core failed: ${err.stderr || err.message}`);
+  } finally {
+    try {
+      await fs.chmod(stagedBinaryPath, 0o700).catch(() => {});
+      await fs.unlink(stagedBinaryPath).catch(() => {});
+    } catch {
+      // Best-effort cleanup
+    }
   }
 }
 
 ipcMain.handle('darx-encrypt', async (event, payload: string, pkHex: string, _engine?: string, hwid?: string) => {
   assertValidIpcSender(event);
-  if (typeof payload !== 'string' || typeof pkHex !== 'string') {
+  if (typeof payload !== 'string' || typeof pkHex !== 'string' || !/^[0-9a-fA-F]+$/.test(pkHex)) {
     throw new Error('Invalid payload or public key argument');
   }
-  if (payload.length > 100 * 1024 * 1024 || pkHex.length > 256) {
+  if (payload.length > 100 * 1024 * 1024 || pkHex.length > 16384) {
     throw new Error('Argument size exceeds maximum permitted limit');
   }
   const cleanHwid = sanitizeHwid(hwid);
@@ -1000,10 +1037,10 @@ ipcMain.handle('darx-encrypt', async (event, payload: string, pkHex: string, _en
 
 ipcMain.handle('darx-decrypt', async (event, data: string, _rk: string, skHex: string, _engine?: string, hwid?: string) => {
   assertValidIpcSender(event);
-  if (typeof data !== 'string' || typeof skHex !== 'string') {
+  if (typeof data !== 'string' || typeof skHex !== 'string' || !/^[0-9a-fA-F]+$/.test(skHex)) {
     throw new Error('Invalid ciphertext or private key argument');
   }
-  if (data.length > 200 * 1024 * 1024 || skHex.length > 256) {
+  if (data.length > 200 * 1024 * 1024 || skHex.length > 16384) {
     throw new Error('Argument size exceeds maximum permitted limit');
   }
   const cleanHwid = sanitizeHwid(hwid);
@@ -1039,17 +1076,7 @@ ipcMain.handle('darx-check-engine', async (event) => {
   }
 
   try {
-    const manifest = loadAuthenticatedEngineManifest();
-    const verifyRes = await verifyEngineBinary(existingPath, manifest);
-    if (!verifyRes.valid) {
-      return {
-        operational: false,
-        binaryPath: existingPath,
-        error: `Engine trust verification failed: ${verifyRes.error}`,
-      };
-    }
-
-    await execFileAsync(existingPath, ['test']);
+    await runDArxCommand(['test']);
     return {
       operational: true,
       binaryPath: existingPath,

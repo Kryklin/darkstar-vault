@@ -110,7 +110,7 @@ export class CryptService {
     // Explicit rejection of legacy v1 containers (backward compatibility dropped)
     if (parsed && typeof parsed === 'object' && parsed['dArxChunked'] === true) {
       throw new Error(
-        'Streaming integrity violation: legacy unauthenticated v1 streaming format (dArxChunked) is deprecated and unsupported. Containers must be re-encrypted using authenticated v2 DARX-STRM.'
+        'Streaming integrity violation: legacy unauthenticated v1 streaming format (dArxChunked) is deprecated and unsupported. Containers must be re-encrypted using authenticated v2 DARX-STRM.',
       );
     }
 
@@ -131,36 +131,21 @@ export class CryptService {
       throw new Error('Streaming integrity violation: invalid streamId format. Expected 32-character hex identifier.');
     }
 
-    if (
-      typeof parsed['totalChunks'] !== 'number' ||
-      !Number.isInteger(parsed['totalChunks']) ||
-      parsed['totalChunks'] <= 0 ||
-      parsed['totalChunks'] > MAX_CHUNKS
-    ) {
+    if (typeof parsed['totalChunks'] !== 'number' || !Number.isInteger(parsed['totalChunks']) || parsed['totalChunks'] <= 0 || parsed['totalChunks'] > MAX_CHUNKS) {
       throw new Error('Streaming integrity violation: invalid or out-of-bounds totalChunks.');
     }
 
-    if (
-      typeof parsed['totalSize'] !== 'number' ||
-      !Number.isInteger(parsed['totalSize']) ||
-      parsed['totalSize'] < 0 ||
-      parsed['totalSize'] > MAX_TOTAL_SIZE
-    ) {
+    if (typeof parsed['totalSize'] !== 'number' || !Number.isInteger(parsed['totalSize']) || parsed['totalSize'] < 0 || parsed['totalSize'] > MAX_TOTAL_SIZE) {
       throw new Error('Streaming integrity violation: invalid or out-of-bounds totalSize.');
     }
 
-    if (
-      typeof parsed['chunkSize'] !== 'number' ||
-      !Number.isInteger(parsed['chunkSize']) ||
-      parsed['chunkSize'] <= 0 ||
-      parsed['chunkSize'] > MAX_CHUNK_SIZE
-    ) {
+    if (typeof parsed['chunkSize'] !== 'number' || !Number.isInteger(parsed['chunkSize']) || parsed['chunkSize'] <= 0 || parsed['chunkSize'] > MAX_CHUNK_SIZE) {
       throw new Error('Streaming integrity violation: invalid or out-of-bounds chunkSize.');
     }
 
     if (!Array.isArray(parsed['chunks']) || parsed['chunks'].length !== parsed['totalChunks']) {
       throw new Error(
-        `Streaming integrity violation: chunks array length (${Array.isArray(parsed['chunks']) ? parsed['chunks'].length : 'not an array'}) does not match totalChunks (${parsed['totalChunks']}).`
+        `Streaming integrity violation: chunks array length (${Array.isArray(parsed['chunks']) ? parsed['chunks'].length : 'not an array'}) does not match totalChunks (${parsed['totalChunks']}).`,
       );
     }
 
@@ -199,12 +184,7 @@ export class CryptService {
         throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (metadata tampering detected).`);
       }
 
-      if (
-        typeof frame['l'] !== 'number' ||
-        !Number.isInteger(frame['l']) ||
-        frame['l'] < 0 ||
-        frame['l'] > parsed['chunkSize']
-      ) {
+      if (typeof frame['l'] !== 'number' || !Number.isInteger(frame['l']) || frame['l'] < 0 || frame['l'] > parsed['chunkSize']) {
         throw new Error(`Streaming integrity violation: chunk ${idx} frame length is invalid or exceeds chunkSize.`);
       }
 
@@ -222,9 +202,7 @@ export class CryptService {
 
     const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
     if (typeof parsed['totalSize'] === 'number' && totalLength !== parsed['totalSize']) {
-      throw new Error(
-        `Streaming integrity violation: assembled stream size (${totalLength}) does not match authenticated container totalSize (${parsed['totalSize']}).`
-      );
+      throw new Error(`Streaming integrity violation: assembled stream size (${totalLength}) does not match authenticated container totalSize (${parsed['totalSize']}).`);
     }
 
     const result = new Uint8Array(totalLength);

@@ -2,13 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import {
-  loadAuthenticatedEngineManifest,
-  verifyEngineBinary,
-  verifyEngineManifestSignature,
-  canonicalizeEngineManifest,
-  EngineManifest,
-} from '../electron/engine-trust';
+import { loadAuthenticatedEngineManifest, verifyEngineBinary, verifyEngineManifestSignature, canonicalizeEngineManifest, EngineManifest } from '../electron/engine-trust';
 import { DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY } from '../electron/trust-anchor';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -95,10 +89,7 @@ async function runTests() {
     ...manifest,
     version: '999.0.0', // Tampered!
   };
-  assert(
-    verifyEngineManifestSignature(tamperedManifest) === false,
-    'Test 6: Tampered manifest payload fails trust anchor signature verification'
-  );
+  assert(verifyEngineManifestSignature(tamperedManifest) === false, 'Test 6: Tampered manifest payload fails trust anchor signature verification');
 
   if (fs.existsSync(validBinPath)) {
     const invalidManifestRes = await verifyEngineBinary(validBinPath, tamperedManifest, {

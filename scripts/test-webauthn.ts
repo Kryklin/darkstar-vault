@@ -1,9 +1,5 @@
 import * as crypto from 'crypto';
-import {
-  verifyWebAuthnAssertion,
-  enrollWebAuthnCredential,
-  NativeWebAuthnRecord,
-} from '../electron/webauthn-verifier';
+import { verifyWebAuthnAssertion, enrollWebAuthnCredential, NativeWebAuthnRecord } from '../electron/webauthn-verifier';
 
 /**
  * WebAuthn Hardening, State Mutation Ordering & Regression Test Suite
@@ -50,7 +46,7 @@ async function runTests() {
       origin: origin,
       crossOrigin: false,
     }),
-    'utf8'
+    'utf8',
   );
   const clientDataHash = crypto.createHash('sha256').update(clientDataJSON).digest();
 
@@ -62,8 +58,8 @@ async function runTests() {
     return buf;
   }
 
-  // Helper to build realistic WebAuthn attestationObject
-  function buildAttestationObject(credId: Buffer, x: Buffer, y: Buffer): Buffer {
+  // Helper to build realistic WebAuthn authData containing attested credential and COSE key
+  function buildAttestationAuthData(credId: Buffer, x: Buffer, y: Buffer): Buffer {
     // COSE Map: 1:2 (kty:EC2), 3:-7 (alg:ES256), -1:1 (crv:P-256), -2:x, -3:y
     const coseKey = Buffer.concat([
       Buffer.from([0xa5]),
@@ -80,7 +76,7 @@ async function runTests() {
     const credIdLen = Buffer.alloc(2);
     credIdLen.writeUInt16BE(credId.length);
 
-    const authData = Buffer.concat([
+    return Buffer.concat([
       rpIdHash,
       Buffer.from([0x45]), // UP (0x01) | UV (0x04) | AT (0x40)
       Buffer.from([0, 0, 0, 0]),
@@ -89,22 +85,23 @@ async function runTests() {
       credId,
       coseKey,
     ]);
+  }
 
-    const attObj = Buffer.concat([
+  // Helper to build realistic WebAuthn attestationObject
+  function buildAttestationObject(credId: Buffer, x: Buffer, y: Buffer): Buffer {
+    const authData = buildAttestationAuthData(credId, x, y);
+    const b = Buffer.alloc(2);
+    b.writeUInt16BE(authData.length);
+
+    return Buffer.concat([
       Buffer.from([0xa3]),
       Buffer.from([0x63, 0x66, 0x6d, 0x74, 0x64, 0x6e, 0x6f, 0x6e, 0x65]), // fmt: "none"
       Buffer.from([0x67, 0x61, 0x74, 0x74, 0x53, 0x74, 0x6d, 0x74, 0xa0]), // attStmt: {}
       Buffer.from([0x68, 0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61]), // "authData"
       Buffer.from([0x59]),
-      (() => {
-        const b = Buffer.alloc(2);
-        b.writeUInt16BE(authData.length);
-        return b;
-      })(),
+      b,
       authData,
     ]);
-
-    return attObj;
   }
 
   // --- Test 1: Valid assertion + increasing counter -> succeeds and persists new counter ---
@@ -217,10 +214,7 @@ async function runTests() {
     assert(result.success === false, 'Test 3: Invalid signature is rejected');
     assert(result.error?.includes('signature mismatch') === true, 'Test 3: Error indicates signature mismatch');
     assert(persisted === false, 'Test 3: Invariant satisfied - registry was NOT persisted on invalid signature');
-    assert(
-      registry[idBase64].counter === initialCounter,
-      `Test 3: Invariant satisfied - counter remained ${initialCounter}, did NOT advance to ${hugeCounter}`
-    );
+    assert(registry[idBase64].counter === initialCounter, `Test 3: Invariant satisfied - counter remained ${initialCounter}, did NOT advance to ${hugeCounter}`);
   }
 
   // --- Test 4: Invalid signature + lower counter -> rejected AND counter remains unchanged ---
@@ -350,7 +344,7 @@ async function runTests() {
         origin: origin,
         crossOrigin: false,
       }),
-      'utf8'
+      'utf8',
     );
 
     const attestationObject = buildAttestationObject(enrollCredId, xCoord, yCoord);
@@ -418,6 +412,39 @@ async function runTests() {
       registry,
     });
     assert(chalMismatchRes.success === false, 'Test 7d: Enrollment with challenge mismatch is rejected');
+
+    // 7e: Enrollment with matching separate authenticatorData and attestationObject succeeds
+    const genuineAuthData = buildAttestationAuthData(enrollCredId, xCoord, yCoord);
+    const matchResult = await enrollWebAuthnCredential({
+      rawId: enrollCredId,
+      clientDataJSON: enrollClientDataJSON,
+      attestationObject,
+      authenticatorData: genuineAuthData,
+      expectedOrigin: origin,
+      expectedRpId: rpId,
+      expectedChallenge: enrollChallenge,
+      registry: {},
+    });
+    assert(matchResult.success === true, 'Test 7e: Enrollment with matching authenticatorData and attestationObject succeeds');
+
+    // 7f: Enrollment with tampered separate authenticatorData is rejected
+    const tamperedAuthData = Buffer.from(genuineAuthData);
+    tamperedAuthData[32] ^= 0xff; // tamper flags byte
+    const mismatchResult = await enrollWebAuthnCredential({
+      rawId: enrollCredId,
+      clientDataJSON: enrollClientDataJSON,
+      attestationObject,
+      authenticatorData: tamperedAuthData,
+      expectedOrigin: origin,
+      expectedRpId: rpId,
+      expectedChallenge: enrollChallenge,
+      registry: {},
+    });
+    assert(mismatchResult.success === false, 'Test 7f: Enrollment with mismatched authenticatorData vs attestationObject is rejected');
+    assert(
+      mismatchResult.error?.includes('authenticatorData does not match authData in attestationObject') === true,
+      'Test 7f: Error indicates authenticatorData and attestationObject authData mismatch',
+    );
   }
 
   // --- Test 8: Atomic Persistence Failure Handling ---
@@ -449,10 +476,7 @@ async function runTests() {
 
     assert(failResult.success === false, 'Test 8a: Assertion reports failure when persistence throws');
     assert(failResult.error?.includes('registry persistence error') === true, 'Test 8a: Error mentions persistence error');
-    assert(
-      registry[idBase64].counter === initialCounter,
-      `Test 8a: Invariant satisfied - in-memory counter remains ${initialCounter} when persistence fails`
-    );
+    assert(registry[idBase64].counter === initialCounter, `Test 8a: Invariant satisfied - in-memory counter remains ${initialCounter} when persistence fails`);
 
     // 8b: Enrollment persistence failure -> in-memory registry MUST NOT contain record
     const emptyRegistry: Record<string, NativeWebAuthnRecord> = {};
@@ -475,10 +499,7 @@ async function runTests() {
     });
 
     assert(enrollFailResult.success === false, 'Test 8b: Enrollment reports failure when persistence throws');
-    assert(
-      Object.keys(emptyRegistry).length === 0,
-      'Test 8b: Invariant satisfied - in-memory registry remains empty when enrollment persistence fails'
-    );
+    assert(Object.keys(emptyRegistry).length === 0, 'Test 8b: Invariant satisfied - in-memory registry remains empty when enrollment persistence fails');
   }
 
   console.log(`\n🎉 All ${passed}/${total} WebAuthn Hardening & Regression Tests PASSED!\n`);
