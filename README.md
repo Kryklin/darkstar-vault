@@ -1,139 +1,151 @@
-<p align="left">
+<p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/assets/img/logo-white.png">
-    <img src="public/assets/img/logo-black.png" width="120" alt="Darkstar Logo">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-anim-dark.svg">
+    <img src="assets/logo-anim-light.svg" width="240" alt="Darkstar Logo">
+  </picture>
+</p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/header-anim-dark.svg">
+    <img src="assets/header-anim-light.svg" width="800" alt="Darkstar Vault Sovereign Security Enclave">
   </picture>
 </p>
 
-# Darkstar Vault: Sovereign Desktop & Mobile Security Enclave
-
-<p align="left">
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white" alt="HTML5">
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3">
-  <img src="https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular">
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-3.0.4-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Core_Engine-D--ARX--512-00E5FF?style=for-the-badge" alt="Core Engine">
+  <img src="https://img.shields.io/badge/License-CC_BY_4.0-orange?style=for-the-badge" alt="License">
 </p>
-
-<p align="left">
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Angular_21-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular">
+  <img src="https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white" alt="Electron">
+  <img src="https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white" alt="Capacitor">
+</p>
+<p align="center">
   <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS">
   <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux">
-  <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=ios&logoColor=white" alt="iOS">
   <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android">
+  <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=ios&logoColor=white" alt="iOS">
 </p>
 
+## <img src="assets/icons/book.svg" width="20" height="20" align="absmiddle" alt="Documentation" /> Documentation Hub
+
+Explore the architecture, specifications, and governance of the Darkstar Vault suite:
+
+| Specification / Guide | Description |
+| :--- | :--- |
+| [**Core Cryptographic Engine (D-ARX-512)**](https://github.com/Kryklin/darkstar) | Mathematical specification, ARX permutation stream cipher, and key schedule. |
+| [**Security Policy**](SECURITY.md) | Vulnerability disclosure, enclave isolation, and security guarantees. |
+| [**Contributing Guidelines**](CONTRIBUTING.md) | Code quality standards, test runner workflows, and PR submission rules. |
+| [**Code of Conduct**](CODE_OF_CONDUCT.md) | Community integrity, ethics, and contributor standards. |
+
+The **Darkstar Vault** (`darkstar-vault`) is a sovereign, defense-grade desktop and mobile security enclave engineered for high-assurance cryptographic asset protection. Built with an air-gapped-first architecture, the application pairs an **Angular** reactive frontend with native execution bridges (**Electron** for desktop and **Capacitor** for mobile), with all cryptographic operations powered by pre-compiled native **D-ARX-512** engines downloaded directly from verified Darkstar releases.
+
+> [!IMPORTANT]
+> **Cryptographic Architecture Notice**:
+>
+> - **Primary Cryptographic Core**: [Darkstar D-ARX-512](https://github.com/Kryklin/darkstar) (`d-arx.exe` / `d-arx`)
+> - **Interoperability**: Bit-perfect cross-platform stream cipher execution across desktop and mobile.
+> - **Zero In-App Custom Crypto**: The vault application delegates 100% of core encryption, key schedule expansion, and permutation cascades to the sovereign D-ARX binary. No legacy or ad-hoc cryptographic modules reside in the client application.
+
 ---
 
-## 🏗️ Architecture Overview
+## <img src="assets/icons/flows.svg" width="20" height="20" align="absmiddle" alt="Architecture" /> System Architecture & Execution Bridges
 
-The **Darkstar Vault** (`darkstar-vault`) application is a unified, defense-grade sovereign security dashboard built using a modern decoupled architecture. It leverages a shared **Angular** frontend that is deployed to native environments via specialized desktop (**Electron**) and mobile (**Capacitor**) bridges.
+Darkstar Vault employs a decoupled multi-layer enclave model:
 
-Under the hood, Darkstar Vault utilizes the sovereign **D-ARX** (Darkstar Algebraic Substitution & Permutation) post-quantum cryptographic engine from the core [kryklin/darkstar](https://github.com/Kryklin/darkstar) project.
+### <img src="assets/icons/terminal.svg" width="18" height="18" align="absmiddle" alt="Desktop" /> Desktop Enclave (Electron)
 
-### 💻 Desktop Execution (Electron)
+The desktop application provides an air-gapped security runtime. The `electron/` main process executes in an isolated context with hardened IPC (`contextBridge`), coordinating:
 
-The desktop application uses **Electron** to provide a secure, air-gapped-ready environment. The `electron/` source manages native IPC (Inter-Process Communication), system biometrics (Windows Hello / TouchID), and hardware-bound integrity checks.
+- Native IPC communication with the `d-arx` binary core via secure stdio pipes.
+- Hardware-backed biometric authentication (Windows Hello / macOS Touch ID).
+- Runtime binary signature & SHA-512 integrity verification against tamper threats.
+- OS-level secure storage delegation via Electron `safeStorage`.
 
-### 📱 Mobile Execution (Capacitor)
+### <img src="assets/icons/tools.svg" width="18" height="18" align="absmiddle" alt="Mobile" /> Mobile Enclave (Capacitor)
 
-For mobile platforms, **Capacitor** bridges the Angular web views to native Android and iOS activities. Hardware-unique identity binding is maintained across all platforms through the standard D-ARX protocol.
+On mobile platforms (Android & iOS), **Capacitor** bridges the Angular web views into sandboxed native activities:
+
+- Biometric authentication via Secure Enclave / Android BiometricPrompt.
+- Air-gapped visual communication via animated QR-code streams.
+- Full offline-first local storage isolation.
 
 ---
 
-## 🚀 Development Workflow
+## <img src="assets/icons/shield.svg" width="20" height="20" align="absmiddle" alt="Shield" /> Security Hardening & Enclave Mitigations
+
+Darkstar Vault is engineered with defense-in-depth hardware and operational countermeasures:
+
+- **Biometric Security Bridge (FIDO2 / WebAuthn)**: Native integration for Windows Hello, Touch ID, Face ID, and hardware security keys (YubiKey via USB/NFC/BLE).
+- **Session Hardening & Zero-Plaintext Memory**: Session master keys are never stored in plaintext on disk; protected via OS-level hardware key stores (`safeStorage` / Keychain / KeyStore).
+- **TOTP Dual-Factor Quarantine**: Vault entries with TOTP protection remain in zeroed memory until secondary synchronous verification via `otplib` passes.
+- **Air-Gapped Data Exfiltration Protection**: Supports animated high-density visual QR transmission and steganographic data concealment (text and audio carriers).
+
+---
+
+## <img src="assets/icons/target.svg" width="20" height="20" align="absmiddle" alt="Packaging" /> Target Distribution Matrix
+
+| Platform | Runtime / Wrapper | Distribution Formats | Security Enclave Integration |
+| :--- | :--- | :--- | :--- |
+| **Windows** | Electron Forge | `.exe` (Squirrel / MSI) | Windows Hello, TPM, DPAPI |
+| **macOS** | Electron Forge | `.dmg`, `.zip` | Touch ID, Secure Enclave, Keychain |
+| **Linux** | Electron Forge | `.deb`, `.rpm` | Libsecret, Secret Service API |
+| **Android** | Capacitor + Gradle | `.apk`, `.aab` | Android BiometricPrompt, Keystore |
+| **iOS** | Capacitor + Xcode | `.ipa` | Face ID / Touch ID, Keychain |
+
+---
+
+## <img src="assets/icons/rocket.svg" width="20" height="20" align="absmiddle" alt="Development" /> Development Workflow
 
 ### Prerequisites
 
 - **Node.js**: v19.0.0+
 - **Angular CLI**: v21.2.0+
-- **CocoaPods** (for iOS development)
-- **Android Studio** (for Android development)
+- **Android Studio** (for Android mobile build targets)
+- **Xcode & CocoaPods** (for macOS / iOS targets)
 
-### Standard Execution
+### Interactive Unified Dashboard
 
-The app uses an interactive developer dashboard for all execution and testing tasks.
+Darkstar Vault includes an interactive CLI dashboard for development, packaging, and auditing:
 
 ```bash
-# Launch the unified dashboard
+# Launch interactive developer dashboard
 npm start
 ```
 
-_Select the **Run Dev Environment** option to launch Angular and Electron concurrently._
+### Core CLI Commands
 
-### Mobile Synchronization
+| Command | Action |
+| :--- | :--- |
+| `npm run dev` | Launch Angular dev server and Electron in concurrent live-reload mode |
+| `npm run build` | Full production bundle compilation, asset hashing, and code obfuscation |
+| `npm test` | Execute Karma test suite in headless Chrome |
+| `npm run lint:ts` | Run ESLint across Angular and Electron TypeScript sources |
+| `npm run format` | Standardize code formatting across TS, HTML, and SCSS via Prettier |
+| `npm run rename:arx` | Scan and enforce D-ARX / Darx cryptographic naming standards |
+| `npm run fetch:engines` | Synchronize native D-ARX binaries from official Darkstar releases |
+| `npm run package` | Package desktop installers via Electron Forge |
 
-When UI changes are made, they must be synchronized to the native mobile wrappers. This can be handled directly via the CLI:
+### Mobile Synchronization (Capacitor)
 
-1. Launch `npm start`.
-2. Select **Sync Mobile Assets**.
-   - This will automatically build the web assets (`npm run build`) and perform the synchronization (`npx cap sync`).
-
-### Opening Native IDEs
+When web interface or service updates are made, synchronize native containers:
 
 ```bash
+# Compile web assets and sync to native mobile platforms
+npm run build
+npx cap sync
+
+# Launch in native IDEs
 npx cap open android
 npx cap open ios
 ```
 
 ---
 
-## 📦 Build & Packaging
+## <img src="assets/icons/scale.svg" width="20" height="20" align="absmiddle" alt="License" /> License & Attribution
 
-Darkstar uses **Electron Forge** for desktop distribution and **Capacitor CLI** for mobile.
-
-| Target Platform | Toolchain          | Output Format           |
-| :-------------- | :----------------- | :---------------------- |
-| **Windows**     | Electron Forge     | `.exe` (Squirrel / MSI) |
-| **macOS**       | Electron Forge     | `.dmg`, `.zip`          |
-| **Linux**       | Electron Forge     | `.deb`, `.rpm`          |
-| **Android**     | Capacitor + Gradle | `.apk`, `.aab`          |
-| **iOS**         | Capacitor + Xcode  | `.ipa`                  |
-
----
-
-## 🔒 The Sovereign Vault
-
-The Darkstar Vault is the primary high-security storage layer for sensitive cryptographic material. Unlike standard password managers, the Vault utilizes a **Hybrid Post-Quantum Strategy** to ensure long-term data resilience.
-
-### Encryption Architecture
-
-- **KEM-DEM Construction**: Uses **ML-KEM-1024** (Kyber) for the KEM layer and the **ASP Cascade 16** engine for the Data Encapsulation (DEM).
-- **Hardened Key Derivation**: Master passwords are expanded using **PBKDF2-HMAC-SHA256** with 100,000 iterations before being injected into the PQC keygen logic.
-- **Hardware Binding**: If enabled, the Vault injects a machine-unique identifier (`machine-id`) as a salt for the **ASP Cascade 16** round diversification, ensuring the data cannot be decrypted on a different physical device even with the correct password.
-
-### Data Model
-
-- **Notes**: Full Markdown support for longform secrets.
-- **Identities**: Secure storage for ECDSA (P-256) and PQC (ML-KEM) key pairs.
-- **Signatures**: Native support for message signing and identity verification.
-
----
-
-## 🛡️ Biometric Security (Windows Hello & TouchID)
-
-Darkstar integrates native hardware authentication to streamline secure access without compromising the underlying cryptographic safety.
-
-### WebAuthn Native Bridge
-
-The app utilizes the **WebAuthn (FIDO2)** API to interface with the system's secure enclave (TPM for Windows, Secure Enclave for macOS).
-
-- **Windows Hello**: Full support for Pin, Fingerprint, and Facial recognition.
-- **TouchID / FaceID**: Native integration for macOS and mobile platforms.
-- **Security Keys**: Supports cross-platform FIDO2/WebAuthn hardware tokens (e.g., YubiKey) via USB, NFC, and BLE.
-
-### Session Hardening
-
-When Biometric Unlock is enabled, Darkstar uses **Electron safeStorage** to protect the session keys. The master password is never stored in plaintext; it is encrypted using the OS-level encryption provider before being cached for biometric retrieval.
-
----
-
-## 🔑 TOTP & 2nd-Factor Authentication
-
-Darkstar provides built-in support for **Time-based One-Time Passwords (TOTP)** to protect high-value vaults with an additional layer of verification.
-
-- **Verification Lifecycle**: If a TOTP secret is present in the vault envelope, the system enters a **"Pending TOTP"** state after initial password decryption. The vault contents remain zeroed in memory until the 6-digit token is verified.
-- **Library integration**: Uses the industry-standard **otplib** for synchronous token validation across all platform bridges.
-
----
-
-[**&larr; Back to Project Root**](README.md)
+Darkstar Vault is licensed under the [Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE).  
+Core cryptographic permutation algorithms provided by [Darkstar-ARX-512](https://github.com/Kryklin/darkstar).
