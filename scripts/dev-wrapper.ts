@@ -1,9 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
+import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { fetchEngines } from './fetch-engines.ts';
 
+const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
