@@ -7,21 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAprFeV34ODSQb4VtTHlbX4EYuz8gJfJLNzlnTHZCIKZo=
------END PUBLIC KEY-----`;
-
-function verifyEd25519Signature(data: Buffer | string, signatureHexOrBase64: string): boolean {
-  try {
-    const dataBuf = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
-    const trimmed = signatureHexOrBase64.trim();
-    const isHex = /^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0;
-    const sigBuf = Buffer.from(trimmed, isHex ? 'hex' : 'base64');
-    return crypto.verify(null, dataBuf, DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, sigBuf);
-  } catch {
-    return false;
-  }
-}
+import { verifyEd25519Signature } from '../electron/trust-anchor';
 
 interface ReleaseAsset {
   name: string;
@@ -217,7 +203,7 @@ export async function fetchEngines(force = false): Promise<boolean> {
       }
       fs.unlinkSync(archivePath);
       extractSpinner.succeed(chalk.green('Archive extracted successfully.'));
-    } catch (extractErr: unknown) {
+    } catch (_extractErr: unknown) {
       extractSpinner.fail(chalk.red('Failed to extract with tar. Trying PowerShell Expand-Archive...'));
       try {
         execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${binDir}' -Force"`);

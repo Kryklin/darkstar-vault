@@ -6,22 +6,57 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const electronDistPath = path.join(__dirname, '..', 'dist', 'electron');
-const filesToHash = ['main.js', 'preload.js', 'preload_handshake.js', 'trust-anchor.js'];
+const distRoot = path.join(__dirname, '..', 'dist');
+const electronDistPath = path.join(distRoot, 'electron');
+const browserDistPath = path.join(distRoot, 'darkstar', 'browser');
 const integrity: Record<string, string> = {};
 
-filesToHash.forEach((file) => {
-  const filePath = path.join(electronDistPath, file);
-  if (fs.existsSync(filePath)) {
-    const fileBuffer = fs.readFileSync(filePath);
+function hashFile(fullPath: string, relPath: string) {
+  if (fs.existsSync(fullPath)) {
+    const fileBuffer = fs.readFileSync(fullPath);
     const hashSum = crypto.createHash('sha256');
     hashSum.update(fileBuffer);
-    const hex = hashSum.digest('hex');
-    integrity[file] = hex;
+    integrity[relPath.replace(/\\/g, '/')] = hashSum.digest('hex');
   } else {
-    console.warn(`File not found for integrity hashing: ${file}`);
+    console.warn(`File not found for integrity hashing: ${relPath}`);
   }
+}
+
+// 1. Electron Main / Preload Runtime
+const electronFiles = ['main.js', 'preload.js', 'preload_handshake.js', 'trust-anchor.js'];
+electronFiles.forEach((file) => {
+  hashFile(path.join(electronDistPath, file), `electron/${file}`);
 });
+
+// 2. Angular Renderer Distribution (JS, HTML, CSS)
+function scanDirectory(dir: string): string[] {
+  let files: string[] = [];
+  if (!fs.existsSync(dir)) return files;
+  for (const item of fs.readdirSync(dir)) {
+    const fullPath = path.join(dir, item);
+    if (fs.statSync(fullPath).isDirectory()) {
+      files = files.concat(scanDirectory(fullPath));
+    } else {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+if (fs.existsSync(browserDistPath)) {
+  const rendererFiles = scanDirectory(browserDistPath);
+  for (const fullPath of rendererFiles) {
+    const ext = path.extname(fullPath).toLowerCase();
+    // Include all script bundles, polyfills, chunks, and index.html
+    if (['.js', '.html', '.css'].includes(ext)) {
+      const relToDist = path.relative(distRoot, fullPath);
+      hashFile(fullPath, relToDist);
+    }
+  }
+  console.log(`Hashed ${Object.keys(integrity).length} runtime & renderer files for integrity manifest.`);
+} else {
+  console.warn(`Warning: Angular browser distribution not found at ${browserDistPath}`);
+}
 
 // Canonical serialization for deterministic signing
 const canonicalManifest = JSON.stringify(integrity, Object.keys(integrity).sort());

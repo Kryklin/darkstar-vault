@@ -67,6 +67,8 @@ If you discover an architectural weakness, memory leakage vector, or cryptograph
 
 - **No Backdoors**: Darkstar Vault contains no administrative backdoors, master bypass keys, or escrow mechanisms.
 - **Zero Telemetry**: We collect zero telemetry, analytical beacons, network tracking, or usage metrics.
+- **Fail-Closed Runtime Integrity**: Packaged application releases enforce an embedded Ed25519 Trust Anchor over all runtime bundles (Electron and Angular renderer JS). Unsigned manifests or checksum discrepancies halt execution immediately.
+- **Build & Release Signing Lifecycle**: Manifest signing keys are strictly isolated. Local release packaging loads credentials from developer-isolated `.env` files, while official production releases utilize CI runner secret injection and dedicated signing infrastructure/HSMs. Private keys are never committed to the repository.
 - **Fully Verifiable Builds**: All source files and build pipelines produce verifiable artifacts with deterministic SHA-256 / SHA-512 integrity checksums.
 
 ---

@@ -62,11 +62,13 @@ export class CryptService {
       const slice = data.subarray(offset, Math.min(offset + CHUNK_SIZE, totalSize));
       const sliceBase64 = this.buf2base64(slice);
 
-      // Authenticated frame: cryptographically binds streamId, chunk index, total chunks, and length
+      // Authenticated frame: cryptographically binds streamId, chunk index, total chunks, total size, and chunkSize
       const framePayload = JSON.stringify({
         s: streamId,
         i: index,
         n: totalChunks,
+        t: totalSize,
+        c: CHUNK_SIZE,
         l: slice.length,
         d: sliceBase64,
       });
@@ -90,7 +92,7 @@ export class CryptService {
 
   /**
    * Decrypts binary data (Uint8Array) via the D-ARX core.
-   * Authenticates streaming frames, validating streamId, chunk sequence, and bounds.
+   * Authenticates streaming frames, validating streamId, chunk sequence, bounds, and total size.
    * Seamlessly unpacks legacy chunked (v1) and unchunked blobs for backward compatibility.
    */
   async decryptBinary(payload: Uint8Array, keyMaterial: string, hwid?: string): Promise<Uint8Array> {
@@ -111,9 +113,16 @@ export class CryptService {
           const { decrypted } = await this.decrypt(chunkCiphertext, '', keyMaterial, hwid);
           const frame = JSON.parse(decrypted);
 
-          // Authenticate frame metadata
-          if (!frame || frame.s !== parsed.streamId || frame.i !== idx || frame.n !== parsed.totalChunks) {
-            throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (reordering or splicing detected).`);
+          // Authenticate frame metadata: streamId, chunk index, chunk count, totalSize, chunkSize
+          if (
+            !frame ||
+            frame.s !== parsed.streamId ||
+            frame.i !== idx ||
+            frame.n !== parsed.totalChunks ||
+            (typeof frame.t === 'number' && frame.t !== parsed.totalSize) ||
+            (typeof frame.c === 'number' && frame.c !== parsed.chunkSize)
+          ) {
+            throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (metadata tampering detected).`);
           }
 
           const binaryStr = atob(frame.d);
@@ -129,6 +138,10 @@ export class CryptService {
         }
 
         const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
+        if (typeof parsed.totalSize === 'number' && totalLength !== parsed.totalSize) {
+          throw new Error(`Streaming integrity violation: assembled stream size (${totalLength}) does not match authenticated container totalSize (${parsed.totalSize}).`);
+        }
+
         const result = new Uint8Array(totalLength);
         let offset = 0;
         for (const slice of decryptedSlices) {

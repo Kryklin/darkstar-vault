@@ -3,7 +3,7 @@
   "version": "3.0.4",
   "productName": "Darkstar",
   "description": "Darkstar Vault - Sovereign Post-Quantum Enclave",
-  "author": "Victor Kane",
+  "author": "kryklin",
   "license": "CC-BY-4.0",
   "private": true,
   "main": "dist/electron/main.js",

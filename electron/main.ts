@@ -900,32 +900,32 @@ interface NativeWebAuthnRecord {
 const getWebAuthnStoragePath = () => path.join(app.getPath('userData'), 'webauthn_registry.json');
 
 async function loadNativeWebAuthnRegistry(): Promise<Record<string, NativeWebAuthnRecord>> {
+  const regPath = getWebAuthnStoragePath();
+  let raw: Buffer;
   try {
-    const regPath = getWebAuthnStoragePath();
-    const raw = await fs.readFile(regPath);
-    let jsonStr: string;
-    if (safeStorage.isEncryptionAvailable()) {
-      try {
-        jsonStr = safeStorage.decryptString(raw);
-      } catch {
-        jsonStr = raw.toString('utf8');
-      }
-    } else {
-      jsonStr = raw.toString('utf8');
+    raw = await fs.readFile(regPath);
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {};
     }
-    return JSON.parse(jsonStr);
-  } catch {
-    return {};
+    throw err;
   }
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('OS safeStorage hardware encryption is unavailable. Refusing to load credentials from unauthenticated storage.');
+  }
+
+  const jsonStr = safeStorage.decryptString(raw);
+  return JSON.parse(jsonStr);
 }
 
 async function saveNativeWebAuthnRegistry(registry: Record<string, NativeWebAuthnRecord>): Promise<void> {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('OS safeStorage hardware encryption is unavailable. Refusing to persist WebAuthn credentials in unencrypted plaintext.');
+  }
   const regPath = getWebAuthnStoragePath();
   const jsonStr = JSON.stringify(registry, null, 2);
-  let payload: Buffer = Buffer.from(jsonStr, 'utf8');
-  if (safeStorage.isEncryptionAvailable()) {
-    payload = safeStorage.encryptString(jsonStr);
-  }
+  const payload = safeStorage.encryptString(jsonStr);
   await fs.writeFile(regPath, payload, { mode: 0o600 });
 }
 
@@ -1048,25 +1048,58 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
         ipcMain.removeListener('handshake-result', resultHandler);
         cleanup();
 
+        const expectedOrigin = `http://localhost:${port}`;
+
         // 1. Enrol credential on 'create' action in native enclave registry
         if (options.action === 'create' && response.success && response.data) {
-          const respData = response.data as { rawId?: number[]; publicKey?: number[] };
-          if (respData.rawId && respData.publicKey) {
-            const idBase64 = Buffer.from(respData.rawId).toString('base64');
-            const pubKeyBase64 = Buffer.from(respData.publicKey).toString('base64');
-            try {
-              const registry = await loadNativeWebAuthnRegistry();
-              registry[idBase64] = {
-                idBase64,
-                publicKeyBase64: pubKeyBase64,
-                counter: 0,
-                createdAt: Date.now(),
-              };
-              await saveNativeWebAuthnRegistry(registry);
-              console.log(`[WebAuthn] Enrolled native credential record: ${idBase64.slice(0, 16)}...`);
-            } catch (saveErr) {
-              console.warn('[WebAuthn] Failed to persist native credential registry:', saveErr);
+          const respData = response.data as {
+            rawId?: number[];
+            publicKey?: number[];
+            response?: {
+              clientDataJSON?: number[];
+              attestationObject?: number[];
+            };
+          };
+
+          const clientDataArr = respData.response?.clientDataJSON;
+          if (!clientDataArr || !respData.rawId || !respData.publicKey) {
+            return resolve({ success: false, error: 'Native enrollment failed: malformed WebAuthn attestation structure.' });
+          }
+
+          let clientDataJson: Record<string, unknown>;
+          try {
+            clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
+            if (clientDataJson['type'] !== 'webauthn.create') {
+              return resolve({ success: false, error: 'Native enrollment failed: attestation type mismatch.' });
             }
+            if (clientDataJson['origin'] !== expectedOrigin) {
+              return resolve({
+                success: false,
+                error: `Native enrollment failed: origin mismatch ('${clientDataJson['origin']}' does not match '${expectedOrigin}').`,
+              });
+            }
+          } catch {
+            return resolve({ success: false, error: 'Native enrollment failed: invalid clientDataJSON.' });
+          }
+
+          const idBase64 = Buffer.from(respData.rawId).toString('base64');
+          const pubKeyBase64 = Buffer.from(respData.publicKey).toString('base64');
+          try {
+            const registry = await loadNativeWebAuthnRegistry();
+            registry[idBase64] = {
+              idBase64,
+              publicKeyBase64: pubKeyBase64,
+              counter: 0,
+              createdAt: Date.now(),
+            };
+            await saveNativeWebAuthnRegistry(registry);
+            console.log(`[WebAuthn] Enrolled native credential record: ${idBase64.slice(0, 16)}...`);
+          } catch (saveErr) {
+            console.error('[WebAuthn] Failed to persist native credential registry:', saveErr);
+            return resolve({
+              success: false,
+              error: `Failed to persist native credential in hardware-backed storage: ${(saveErr as Error).message}`,
+            });
           }
         }
 
@@ -1095,16 +1128,12 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
               return resolve({ success: false, error: 'Native verification failed: assertion type mismatch.' });
             }
 
-            // Origin check: must match ephemeral localhost origin
-            const actualOrigin = clientDataJson['origin'];
-            if (typeof actualOrigin === 'string') {
-              const expectedOrigin = `http://localhost:${port}`;
-              if (actualOrigin !== expectedOrigin && actualOrigin !== 'http://localhost' && actualOrigin !== 'http://127.0.0.1') {
-                return resolve({
-                  success: false,
-                  error: `Native verification failed: origin mismatch ('${actualOrigin}' does not match '${expectedOrigin}').`,
-                });
-              }
+            // Origin check: must strictly match ephemeral localhost origin
+            if (clientDataJson['origin'] !== expectedOrigin) {
+              return resolve({
+                success: false,
+                error: `Native verification failed: origin mismatch ('${clientDataJson['origin']}' does not match '${expectedOrigin}').`,
+              });
             }
           } catch {
             return resolve({ success: false, error: 'Native verification failed: invalid clientDataJSON.' });
