@@ -15,20 +15,17 @@ const pkg = require('../package.json');
   const { default: inquirer } = await import('inquirer');
   const { execa } = await import('execa');
 
-  // Basic .env loader to support GitHub tokens without terminal restarts
+  // Robust .env loader supporting multi-line quoted values (e.g. PEM private keys)
   const envPath = path.join(__dirname, '../.env');
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, 'utf8');
-    envContent.split('\n').forEach((line: string) => {
-      const [key, ...valueParts] = line.split('=');
-      if (key && valueParts.length > 0) {
-        const value = valueParts
-          .join('=')
-          .trim()
-          .replace(/^["']|["']$/g, '');
-        process.env[key.trim()] = value;
-      }
-    });
+    const regex = /^\s*([A-Za-z0-9_]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\r\n#]*))/gm;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(envContent)) !== null) {
+      const key = match[1];
+      const value = (match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] || '').trim();
+      process.env[key] = value;
+    }
   }
 
   /**

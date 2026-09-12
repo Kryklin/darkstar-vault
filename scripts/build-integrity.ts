@@ -64,9 +64,9 @@ if (fs.existsSync(browserDistPath)) {
 // Canonical serialization for deterministic signing
 const canonicalManifest = JSON.stringify(integrity, Object.keys(integrity).sort());
 
-// Basic .env loader to support local signed builds
+// Robust .env loader to support local signed builds
 const envPath = path.join(__dirname, '..', '.env');
-if (!process.env.DARKSTAR_BUILD_PRIVATE_KEY && fs.existsSync(envPath)) {
+if ((!process.env.DARKSTAR_BUILD_PRIVATE_KEY || !process.env.DARKSTAR_BUILD_PRIVATE_KEY.includes('END PRIVATE KEY')) && fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
   const match = envContent.match(/DARKSTAR_BUILD_PRIVATE_KEY\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\r\n]+))/s);
   if (match) {

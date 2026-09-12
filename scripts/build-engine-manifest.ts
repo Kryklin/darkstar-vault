@@ -11,7 +11,7 @@ const rootDir = path.resolve(__dirname, '..');
 const envPath = path.join(rootDir, '.env');
 
 // 1. Resolve signing key from environment or .env
-if (!process.env.DARKSTAR_BUILD_PRIVATE_KEY && fs.existsSync(envPath)) {
+if ((!process.env.DARKSTAR_BUILD_PRIVATE_KEY || !process.env.DARKSTAR_BUILD_PRIVATE_KEY.includes('END PRIVATE KEY')) && fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
   const match = envContent.match(/DARKSTAR_BUILD_PRIVATE_KEY\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\r\n]+))/s);
   if (match) {
