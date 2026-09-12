@@ -26,10 +26,9 @@ const path = require('path');
 
   console.log(chalk.blue('Starting Nodemon Wrapper...'));
 
-  const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const nodemon = spawn(npxCmd, ['nodemon', '--config', 'nodemon.json'], {
+  const nodemonBin = require.resolve('nodemon/bin/nodemon.js');
+  const nodemon = spawn(process.execPath, [nodemonBin, '--config', 'nodemon.json'], {
     stdio: ['inherit', 'pipe', 'pipe'],
-    shell: false,
   });
 
   nodemon.stdout.on('data', (data) => {
