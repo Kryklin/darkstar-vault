@@ -40,7 +40,10 @@ function initUpdater() {
       autoUpdater.on('error', (err) => sendStatusToWindow('error', err.message));
       autoUpdater.on('update-downloaded', () => sendStatusToWindow('downloaded'));
 
-      updateElectronApp({ notifyUser: false });
+      updateElectronApp({
+        repo: 'Kryklin/darkstar-vault',
+        notifyUser: false,
+      });
       updaterInitialized = true;
     } catch (err) {
       console.error('Main: Failed to initialize auto-updater', err);

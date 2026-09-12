@@ -110,7 +110,16 @@ export class UpdateService {
       // Simulate a small delay for UX so it doesn't flash too fast
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      const response = await fetch('https://api.github.com/repos/Kryklin/darkstar-vault/releases/latest');
+      const response = await fetch('https://api.github.com/repos/Kryklin/darkstar-vault/releases/latest', {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
+
+      if (response.status === 404) {
+        // No published releases found yet on Kryklin/darkstar-vault
+        this.updateStatus.set('not-available');
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`GitHub API Error: ${response.statusText}`);
       }
