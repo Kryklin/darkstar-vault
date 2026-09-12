@@ -902,8 +902,18 @@ const getWebAuthnStoragePath = () => path.join(app.getPath('userData'), 'webauth
 async function loadNativeWebAuthnRegistry(): Promise<Record<string, NativeWebAuthnRecord>> {
   try {
     const regPath = getWebAuthnStoragePath();
-    const content = await fs.readFile(regPath, 'utf8');
-    return JSON.parse(content);
+    const raw = await fs.readFile(regPath);
+    let jsonStr: string;
+    if (safeStorage.isEncryptionAvailable()) {
+      try {
+        jsonStr = safeStorage.decryptString(raw);
+      } catch {
+        jsonStr = raw.toString('utf8');
+      }
+    } else {
+      jsonStr = raw.toString('utf8');
+    }
+    return JSON.parse(jsonStr);
   } catch {
     return {};
   }
@@ -911,7 +921,12 @@ async function loadNativeWebAuthnRegistry(): Promise<Record<string, NativeWebAut
 
 async function saveNativeWebAuthnRegistry(registry: Record<string, NativeWebAuthnRecord>): Promise<void> {
   const regPath = getWebAuthnStoragePath();
-  await fs.writeFile(regPath, JSON.stringify(registry, null, 2), { encoding: 'utf8', mode: 0o600 });
+  const jsonStr = JSON.stringify(registry, null, 2);
+  let payload: Buffer = Buffer.from(jsonStr, 'utf8');
+  if (safeStorage.isEncryptionAvailable()) {
+    payload = safeStorage.encryptString(jsonStr);
+  }
+  await fs.writeFile(regPath, payload, { mode: 0o600 });
 }
 
 ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action: 'create' | 'get'; publicKey: unknown }) => {
@@ -1078,6 +1093,18 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
             clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
             if (clientDataJson['type'] !== 'webauthn.get') {
               return resolve({ success: false, error: 'Native verification failed: assertion type mismatch.' });
+            }
+
+            // Origin check: must match ephemeral localhost origin
+            const actualOrigin = clientDataJson['origin'];
+            if (typeof actualOrigin === 'string') {
+              const expectedOrigin = `http://localhost:${port}`;
+              if (actualOrigin !== expectedOrigin && actualOrigin !== 'http://localhost' && actualOrigin !== 'http://127.0.0.1') {
+                return resolve({
+                  success: false,
+                  error: `Native verification failed: origin mismatch ('${actualOrigin}' does not match '${expectedOrigin}').`,
+                });
+              }
             }
           } catch {
             return resolve({ success: false, error: 'Native verification failed: invalid clientDataJSON.' });
