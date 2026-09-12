@@ -6,7 +6,7 @@
   "author": "Victor Kane",
   "license": "CC0-1.0",
   "private": true,
-  "main": "scripts/package.ts",
+  "main": "dist/electron/main.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/Kryklin/darkstar-vault.git"
