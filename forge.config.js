@@ -3,6 +3,21 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const path = require('path');
 const fs = require('fs');
 
+// Load environment variables from local .env if present
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  const regex = /^\s*([A-Za-z0-9_]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\r\n#]*))/gm;
+  let match;
+  while ((match = regex.exec(envContent)) !== null) {
+    const key = match[1];
+    const value = (match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] || '').trim();
+    if (value) {
+      process.env[key] = value;
+    }
+  }
+}
+
 const ext = process.platform === 'win32' ? '.exe' : '';
 
 function getExtraResources() {
@@ -103,6 +118,7 @@ module.exports = {
           owner: 'Kryklin',
           name: 'darkstar-vault',
         },
+        authToken: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
         prerelease: false,
         draft: false,
       },

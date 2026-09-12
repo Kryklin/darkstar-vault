@@ -16,17 +16,22 @@ const pkg = require('../package.json');
   const { execa } = await import('execa');
 
   // Robust .env loader supporting multi-line quoted values (e.g. PEM private keys)
-  const envPath = path.join(__dirname, '../.env');
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const regex = /^\s*([A-Za-z0-9_]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\r\n#]*))/gm;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(envContent)) !== null) {
-      const key = match[1];
-      const value = (match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] || '').trim();
-      process.env[key] = value;
+  function loadEnv() {
+    const envPath = path.join(__dirname, '../.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const regex = /^\s*([A-Za-z0-9_]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\r\n#]*))/gm;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(envContent)) !== null) {
+        const key = match[1];
+        const value = (match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] || '').trim();
+        if (value) {
+          process.env[key] = value;
+        }
+      }
     }
   }
+  loadEnv();
 
   /**
    * Clears the terminal and displays the project header.
@@ -241,8 +246,53 @@ const pkg = require('../package.json');
     }
   }
 
+  /**
+   * Verifies GitHub token validity against the GitHub REST API before initiating releases.
+   */
+  async function verifyGitHubToken(): Promise<boolean> {
+    loadEnv();
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (!token) {
+      console.log(chalk.red.bold('\n⚠️  Error: GITHUB_TOKEN not found in environment or .env.'));
+      console.log(chalk.yellow('Publishing requires a GitHub Personal Access Token (PAT) with "repo" scope.'));
+      console.log(chalk.yellow('Please set GITHUB_TOKEN in your .env file in the root directory:'));
+      console.log(chalk.cyan('GITHUB_TOKEN=ghp_your_token_here\n'));
+      return false;
+    }
+
+    const spinner = ora(chalk.blue('Verifying GitHub authentication token...')).start();
+    try {
+      const res = await fetch('https://api.github.com/user', {
+        headers: {
+          'User-Agent': 'Darkstar-Vault-CLI',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401) {
+        spinner.fail(chalk.red.bold('GitHub Token Authentication Failed (401 Bad credentials).'));
+        console.log(chalk.yellow('\nYour GITHUB_TOKEN is expired or invalid.'));
+        console.log(chalk.yellow('Please update GITHUB_TOKEN in your .env file with a valid Personal Access Token.'));
+        return false;
+      }
+
+      if (!res.ok) {
+        spinner.warn(chalk.yellow(`GitHub API responded with status ${res.status}: ${res.statusText}`));
+      } else {
+        const data = (await res.json()) as { login?: string };
+        const scopes = res.headers.get('x-oauth-scopes') || 'default';
+        spinner.succeed(chalk.green(`GitHub Token authenticated as @${data.login || 'user'} (scopes: ${scopes})`));
+      }
+      return true;
+    } catch (err: unknown) {
+      spinner.warn(chalk.yellow(`Could not verify GitHub token network connectivity: ${(err as Error).message}`));
+      return true;
+    }
+  }
+
   // --- Main Execution Loop ---
   while (true) {
+    loadEnv();
     printHeader();
 
     const { action } = await inquirer.prompt([
@@ -285,6 +335,11 @@ const pkg = require('../package.json');
     // Execute selected action
     try {
       if (action === 'all') {
+        const tokenOk = await verifyGitHubToken();
+        if (!tokenOk) {
+          throw new Error('Release aborted: invalid or missing GitHub token.');
+        }
+
         await checkEnvironment(false); // Fail-safe dependency check
 
         const stages = [
@@ -296,14 +351,6 @@ const pkg = require('../package.json');
 
         for (let i = 0; i < stages.length; i++) {
           const stage = stages[i];
-
-          if (stage.name === 'Publishing' && !process.env.GITHUB_TOKEN && !process.env.GH_TOKEN) {
-            console.log(chalk.red.bold('\n⚠️  Error: GITHUB_TOKEN not found in environment.'));
-            console.log(chalk.yellow('Publishing requires a GitHub Personal Access Token.'));
-            console.log(chalk.yellow('Please create a .env file in the root directory with:'));
-            console.log(chalk.cyan('GITHUB_TOKEN=your_token_here\n'));
-            break;
-          }
 
           const stageNameWithProgress = `[Stage ${i + 1}/${stages.length}] ${stage.name}`;
           await runShell(stageNameWithProgress, stage.cmd, stage.options || { clear: true });
@@ -369,12 +416,9 @@ const pkg = require('../package.json');
             await runShell('Building', CMD.BUILD, { showOutput: true });
             await runShell('Packaging', CMD.PACKAGE, { clear: true, showOutput: true });
             break;
-          case 'publish':
-            if (!process.env.GITHUB_TOKEN && !process.env.GH_TOKEN) {
-              console.log(chalk.red.bold('\n⚠️  Error: GITHUB_TOKEN not found in environment.'));
-              console.log(chalk.yellow('Publishing requires a GitHub Personal Access Token.'));
-              console.log(chalk.yellow('Please create a .env file in the root directory with:'));
-              console.log(chalk.cyan('GITHUB_TOKEN=your_token_here\n'));
+          case 'publish': {
+            const tokenOk = await verifyGitHubToken();
+            if (!tokenOk) {
               break;
             }
             await ensureEnginesPresent();
@@ -382,6 +426,7 @@ const pkg = require('../package.json');
             await runShell('Building', CMD.BUILD, { showOutput: true });
             await runShell('Publishing', CMD.PUBLISH, { clear: false, showOutput: true });
             break;
+          }
         }
       }
     } catch (err: unknown) {
