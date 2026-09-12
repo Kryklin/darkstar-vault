@@ -77,15 +77,11 @@ export async function fetchEngines(force = false): Promise<boolean> {
 
     // Determine appropriate asset for current OS
     const assetKeyword = isWindows ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
-    let targetAsset = release.assets.find(
-      (a) => a.name.toLowerCase().includes('rust-engine') && a.name.toLowerCase().includes(assetKeyword),
-    );
+    let targetAsset = release.assets.find((a) => a.name.toLowerCase().includes('rust-engine') && a.name.toLowerCase().includes(assetKeyword));
 
     // Fallback to c-engine if rust-engine not available for platform
     if (!targetAsset) {
-      targetAsset = release.assets.find(
-        (a) => a.name.toLowerCase().includes('engine') && a.name.toLowerCase().includes(assetKeyword),
-      );
+      targetAsset = release.assets.find((a) => a.name.toLowerCase().includes('engine') && a.name.toLowerCase().includes(assetKeyword));
     }
 
     if (!targetAsset) {

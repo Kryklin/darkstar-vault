@@ -1,24 +1,23 @@
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 import { execa } from 'execa';
+
+interface FormatJob {
+  name: string;
+  cmd: string;
+  status?: string;
+}
 
 (async () => {
   const { default: ora } = await import('ora');
   const { default: chalk } = await import('chalk');
   const { default: Table } = await import('cli-table3');
 
-  console.log(chalk.hex('#FFD700').bold('\n  ✨  Polyglot Code Formatting\n'));
+  console.log(chalk.hex('#FFD700').bold('\n  ✨  Codebase Formatting (Prettier)\n'));
 
-  const jobs = [
-    { name: 'TypeScript / HTML (Prettier)', cmd: 'npm run format:ts' },
-    { name: 'Rust (rustfmt)', cmd: 'npm run format:rust' },
-    { name: 'Go (gofmt)', cmd: 'npm run format:go' },
-    { name: 'C / CUDA (clang-format)', cmd: 'npm run format:c' },
-    { name: 'Python (Black)', cmd: 'npm run format:python' },
+  const jobs: FormatJob[] = [
+    {
+      name: 'TypeScript, HTML & SCSS',
+      cmd: 'npx prettier --write "src/**/*.{ts,html,scss}" "electron/**/*.ts" "scripts/**/*.ts"',
+    },
   ];
 
   for (let i = 0; i < jobs.length; i++) {
@@ -28,10 +27,11 @@ import { execa } from 'execa';
       await execa(job.cmd, { shell: true });
       job.status = chalk.green('Formatted');
       spinner.succeed(chalk.green(`${job.name} formatted successfully.`));
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
       job.status = chalk.red('Failed');
       spinner.fail(chalk.red(`${job.name} formatting failed.`));
-      console.log(chalk.dim('\n' + (error.stdout || error.stderr || error.message) + '\n'));
+      console.log(chalk.dim('\n' + (err.stdout || err.stderr || err.message) + '\n'));
     }
   }
 
@@ -44,8 +44,8 @@ import { execa } from 'execa';
   let allPassed = true;
 
   jobs.forEach((j) => {
-    table.push([j.name, j.status]);
-    if (j.status.includes('Failed')) allPassed = false;
+    table.push([j.name, j.status || 'Pending']);
+    if (j.status && j.status.includes('Failed')) allPassed = false;
   });
 
   console.log('\n' + table.toString() + '\n');

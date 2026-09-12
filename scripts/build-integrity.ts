@@ -1,16 +1,14 @@
-import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
+
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const fs = require('fs');
-const crypto = require('crypto');
-const path = require('path');
+const __dirname = path.dirname(__filename);
 
 const electronDistPath = path.join(__dirname, '..', 'dist', 'electron');
 const filesToHash = ['main.js', 'preload.js'];
-const integrity = {};
+const integrity: Record<string, string> = {};
 
 filesToHash.forEach((file) => {
   const filePath = path.join(electronDistPath, file);

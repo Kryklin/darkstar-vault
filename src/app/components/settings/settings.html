@@ -74,9 +74,9 @@
               <span class="title">D-ARX-512 Core Engine</span>
               <span class="description">Post-Quantum ML-KEM-1024 and ARX-512 native core from Darkstar releases. Operates strictly offline.</span>
             </div>
-            <div class="engine-status-box" style="display: flex; align-items: center; gap: 12px;">
-              <span class="engine-badge" [style.color]="engineOperational ? '#00e676' : '#ff5252'" style="font-weight: bold; display: flex; align-items: center; gap: 6px;">
-                <mat-icon style="font-size: 20px; width: 20px; height: 20px;">{{ engineOperational ? 'check_circle' : 'warning' }}</mat-icon>
+            <div class="engine-status-box" style="display: flex; align-items: center; gap: 12px">
+              <span class="engine-badge" [style.color]="engineOperational ? '#00e676' : '#ff5252'" style="font-weight: bold; display: flex; align-items: center; gap: 6px">
+                <mat-icon style="font-size: 20px; width: 20px; height: 20px">{{ engineOperational ? 'check_circle' : 'warning' }}</mat-icon>
                 {{ engineOperational ? 'Operational (D-ARX-512)' : 'Engine Not Found' }}
               </span>
               @if (isElectron) {

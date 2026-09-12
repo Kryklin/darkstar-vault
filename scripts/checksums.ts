@@ -1,12 +1,10 @@
-import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
+
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+const __dirname = path.dirname(__filename);
 
 const MAKE_DIR = path.join(__dirname, '../out/make');
 const OUT_FILE = path.join(__dirname, '../checksums.txt');
@@ -18,16 +16,15 @@ if (!fs.existsSync(MAKE_DIR)) {
   process.exit(0);
 }
 
-function getAllFiles(dirPath, arrayOfFiles) {
+function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
   const files = fs.readdirSync(dirPath);
 
-  arrayOfFiles = arrayOfFiles || [];
-
-  files.forEach(function (file) {
-    if (fs.statSync(path.join(dirPath, file)).isDirectory()) {
-      arrayOfFiles = getAllFiles(path.join(dirPath, file), arrayOfFiles);
+  files.forEach((file) => {
+    const fullPath = path.join(dirPath, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
     } else {
-      arrayOfFiles.push(path.join(dirPath, file));
+      arrayOfFiles.push(fullPath);
     }
   });
 

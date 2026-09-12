@@ -143,14 +143,6 @@ const pkg = require('../package.json');
     if (interactive) printHeader();
     const spinner = ora(chalk.blue('Checking development environment...')).start();
 
-    // Inject common installation paths into process.env.PATH so newly installed tools are detected without a terminal restart
-    const commonPaths = ['C:\\Program Files\\LLVM\\bin', 'C:\\Program Files\\Go\\bin', path.join(process.env.USERPROFILE || '', '.cargo', 'bin')];
-    for (const p of commonPaths) {
-      if (process.env.PATH && !process.env.PATH.includes(p) && fs.existsSync(p)) {
-        process.env.PATH = `${p}${path.delimiter}${process.env.PATH}`;
-      }
-    }
-
     const deps = [
       { name: 'Node.js', cmd: 'node', args: ['--version'], pkg: 'OpenJS.NodeJS', installer: 'winget' },
       { name: 'npm', cmd: 'npm', args: ['--version'], pkg: 'OpenJS.NodeJS', installer: 'winget' },
@@ -164,23 +156,6 @@ const pkg = require('../package.json');
         await execa(dep.cmd, dep.args, { preferLocal: true, shell: process.platform === 'win32' });
         if (interactive) console.log(chalk.green(`✔ ${dep.name} is installed.`));
       } catch (_e) {
-        // Try fallback for C compiler if clang fails
-        if (dep.cmd === 'clang') {
-          try {
-            await execa('gcc', ['--version'], { preferLocal: true, shell: process.platform === 'win32' });
-            if (interactive) console.log(chalk.green(`✔ C Compiler (gcc) is installed.`));
-            continue;
-          } catch (_e2) {
-            // Try explicit LLVM path fallback
-            try {
-              await execa('C:\\Program Files\\LLVM\\bin\\clang.exe', ['--version']);
-              if (interactive) console.log(chalk.green(`✔ C Compiler (clang) is installed at C:\\Program Files\\LLVM.`));
-              continue;
-            } catch (_e3) {
-              // Both failed
-            }
-          }
-        }
         if (interactive) console.log(chalk.red(`✖ ${dep.name} is missing.`));
         missing.push(dep);
       }
@@ -220,7 +195,7 @@ const pkg = require('../package.json');
     }
 
     if (!interactive) {
-      throw new Error(`Missing required development tools: ${missing.map((m) => m.name).join(', ')}.\nPlease run the "Run Dev Environment Check" from the main menu to install them.`);
+      throw new Error(`Missing required development tools: ${missing.map((m) => m.name).join(', ')}.\nPlease install them or run check-env.`);
     }
 
     console.log(chalk.yellow(`\nMissing tools detected: ${missing.map((m) => m.name).join(', ')}`));
@@ -238,15 +213,8 @@ const pkg = require('../package.json');
         const installSpinner = ora(chalk.blue(`Installing ${dep.name}...`)).start();
         try {
           if (dep.installer === 'winget') {
-            // Elevated powershell process for winget installation
             const psCommand = `Start-Process -Wait -Verb RunAs "winget" -ArgumentList "install", "${dep.pkg}", "--silent", "--accept-package-agreements", "--accept-source-agreements"`;
             await execa('powershell', ['-NoProfile', '-Command', psCommand]);
-          } else if (dep.installer === 'cargo') {
-            await execa('cargo', ['install', dep.pkg], { preferLocal: true });
-          } else if (dep.installer === 'go') {
-            await execa('go', ['install', dep.pkg], { preferLocal: true });
-          } else if (dep.installer === 'pip') {
-            await execa('python', ['-m', 'pip', 'install', dep.pkg], { preferLocal: true });
           }
           installSpinner.succeed(chalk.green(`Successfully installed ${dep.name}!`));
         } catch (err: unknown) {

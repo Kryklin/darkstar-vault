@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
-import { StealthMode, StealthOptions, StegoGenerator, LogGenerator, CsvGenerator, JsonGenerator } from './generators';
-import { AudioGenerator } from './generators/audio.generator';
-import { TextGenerator } from './generators/text.generator';
+import { StealthMode, StealthOptions, StegoGenerator, LogGenerator, CsvGenerator, JsonGenerator, AudioGenerator, TextGenerator } from './generators';
 
 @Injectable({
   providedIn: 'root',

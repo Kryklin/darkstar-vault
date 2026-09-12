@@ -21,7 +21,7 @@ interface ElectronAPI {
   safeStorageEncrypt(text: string): Promise<string>;
   safeStorageDecrypt(base64: string): Promise<string>;
   safeStorageAvailable(): Promise<boolean>;
-  dAsPEncrypt(mnemonic: string, keyHex: string, engine: string, hwid?: string): Promise<unknown>;
+  dAsPEncrypt(payload: string, keyHex: string, engine: string, hwid?: string): Promise<unknown>;
   dAsPDecrypt(data: string, rk: string, keyOrPass: string, engine: string, hwid?: string): Promise<unknown>;
   dAsPCheckEngine(): Promise<{ operational: boolean; binaryPath?: string; name?: string; error?: string }>;
   dAsPFetchEngine(): Promise<{ success: boolean; binaryPath?: string; error?: string }>;
@@ -47,6 +47,3 @@ interface ElectronAPI {
 interface Window {
   electronAPI: ElectronAPI;
 }
-
-declare module 'electron-squirrel-startup';
-declare module 'update-electron-app';

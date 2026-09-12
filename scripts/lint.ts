@@ -19,9 +19,7 @@ interface LintJob {
 
   console.log(chalk.hex('#00BFFF').bold('\n  🔍  Code Linting Initialization\n'));
 
-  const jobs: LintJob[] = [
-    { name: 'TypeScript', cmd: 'npm run lint:ts' },
-  ];
+  const jobs: LintJob[] = [{ name: 'TypeScript', cmd: 'npm run lint:ts' }];
 
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];

@@ -21,9 +21,7 @@ interface AuditItem {
 
   console.log(chalk.hex('#00ADD8').bold('\n  🛡️  Security Audit Initialization\n'));
 
-  const results: AuditItem[] = [
-    { name: 'NPM (JavaScript)', status: 'Pending', vulns: 0, cmd: 'npm audit --json', parse: parseNpm },
-  ];
+  const results: AuditItem[] = [{ name: 'NPM (JavaScript)', status: 'Pending', vulns: 0, cmd: 'npm audit --json', parse: parseNpm }];
 
   for (let i = 0; i < results.length; i++) {
     const item = results[i];

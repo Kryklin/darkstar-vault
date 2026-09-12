@@ -3,11 +3,18 @@ import * as http from 'http';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
+import * as crypto from 'crypto';
+import { execFile, execSync } from 'child_process';
+import { promisify } from 'util';
 import { updateElectronApp } from 'update-electron-app';
 import { machineIdSync } from 'node-machine-id';
+import squirrelStartup from 'electron-squirrel-startup';
+import { authenticator } from 'otplib';
+import { verifyIntegrity } from './integrity';
+
+const execFileAsync = promisify(execFile);
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-import squirrelStartup from 'electron-squirrel-startup';
 if (squirrelStartup) {
   app.quit();
   process.exit(0);
@@ -186,8 +193,6 @@ function createTray() {
   });
 }
 
-import { verifyIntegrity } from './integrity';
-
 app.whenReady().then(async () => {
   protocol.handle('app', async (request) => {
     const url = new URL(request.url);
@@ -331,8 +336,6 @@ ipcMain.handle('get-machine-id', () => {
 
 ipcMain.handle('check-integrity', () => true);
 
-import { authenticator } from 'otplib';
-
 ipcMain.handle('vault-generate-totp', () => {
   const secret = authenticator.generateSecret();
   const uri = authenticator.keyuri('user', 'Darkstar', secret);
@@ -443,11 +446,6 @@ ipcMain.handle('open-backup', async (_event, filePath: string) => {
   }
 });
 
-import * as crypto from 'crypto';
-import { execFile, execSync } from 'child_process';
-import { promisify } from 'util';
-const execFileAsync = promisify(execFile);
-
 interface ReleaseAsset {
   name: string;
   browser_download_url: string;
@@ -475,10 +473,7 @@ function getEngineCandidatePaths(): string[] {
 
   // 2. User Data directory (downloaded or installed at runtime)
   const userDataBinDir = path.join(app.getPath('userData'), 'bin');
-  candidateSearchPaths.push(
-    path.join(userDataBinDir, `d-arx-512${ext}`),
-    path.join(userDataBinDir, `d-asp${ext}`),
-  );
+  candidateSearchPaths.push(path.join(userDataBinDir, `d-arx-512${ext}`), path.join(userDataBinDir, `d-asp${ext}`));
 
   // 3. Packaged resources path
   if (app.isPackaged) {
@@ -494,12 +489,7 @@ function getEngineCandidatePaths(): string[] {
 
   // 4. Local workspace ./bin directory
   const rootBinDir = path.resolve(__dirname, '..', '..', 'bin');
-  candidateSearchPaths.push(
-    path.join(rootBinDir, `d-arx-512${ext}`),
-    path.join(rootBinDir, `d-asp${ext}`),
-    path.join(rootBinDir, `main${ext}`),
-    path.join(rootBinDir, `dasp${ext}`),
-  );
+  candidateSearchPaths.push(path.join(rootBinDir, `d-arx-512${ext}`), path.join(rootBinDir, `d-asp${ext}`), path.join(rootBinDir, `main${ext}`), path.join(rootBinDir, `dasp${ext}`));
 
   return candidateSearchPaths;
 }
@@ -512,9 +502,7 @@ async function fetchEngineFromReleases(): Promise<string> {
   const ext = isWindows ? '.exe' : '';
 
   // Target directory: rootBinDir if dev, userDataBinDir if packaged
-  const targetBinDir = app.isPackaged
-    ? path.join(app.getPath('userData'), 'bin')
-    : path.resolve(__dirname, '..', '..', 'bin');
+  const targetBinDir = app.isPackaged ? path.join(app.getPath('userData'), 'bin') : path.resolve(__dirname, '..', '..', 'bin');
 
   if (!fsSync.existsSync(targetBinDir)) {
     fsSync.mkdirSync(targetBinDir, { recursive: true });
@@ -542,13 +530,9 @@ async function fetchEngineFromReleases(): Promise<string> {
   const release = (await res.json()) as ReleaseData;
   const assetKeyword = isWindows ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
 
-  let targetAsset = release.assets.find(
-    (a) => a.name.toLowerCase().includes('rust-engine') && a.name.toLowerCase().includes(assetKeyword),
-  );
+  let targetAsset = release.assets.find((a) => a.name.toLowerCase().includes('rust-engine') && a.name.toLowerCase().includes(assetKeyword));
   if (!targetAsset) {
-    targetAsset = release.assets.find(
-      (a) => a.name.toLowerCase().includes('engine') && a.name.toLowerCase().includes(assetKeyword),
-    );
+    targetAsset = release.assets.find((a) => a.name.toLowerCase().includes('engine') && a.name.toLowerCase().includes(assetKeyword));
   }
 
   if (!targetAsset) {
@@ -654,8 +638,8 @@ async function runDAsPCommand(args: string[]): Promise<unknown> {
   if (!foundBinary) {
     throw new Error(
       `D-ARX-512 Native Core executable not found.\n` +
-      `Please ensure the engine is installed in ./bin/d-arx-512${ext} or specify DARKSTAR_ENGINE_PATH in .env.\n` +
-      `Engine binaries can be downloaded from: https://github.com/Kryklin/darkstar/releases`
+        `Please ensure the engine is installed in ./bin/d-arx-512${ext} or specify DARKSTAR_ENGINE_PATH in .env.\n` +
+        `Engine binaries can be downloaded from: https://github.com/Kryklin/darkstar/releases`,
     );
   }
 
