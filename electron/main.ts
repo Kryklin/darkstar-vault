@@ -145,56 +145,7 @@ function createWindow() {
     win.loadURL('http://localhost:4200');
     win.webContents.openDevTools();
   } else {
-    (async () => {
-      try {
-        const distPath = path.join(__dirname, '..', '..', 'dist', 'darkstar', 'browser');
-
-        // Execution of legacy origin migration sequence
-        await win.loadFile(path.join(distPath, 'index.html'));
-        const fileData = await win.webContents.executeJavaScript('Object.assign({}, window.localStorage)');
-
-        await win.loadURL('app://index.html');
-        const appData = await win.webContents.executeJavaScript('Object.assign({}, window.localStorage)');
-
-        await win.loadURL('app://darkstar/index.html');
-        const darkstarData = await win.webContents.executeJavaScript('Object.assign({}, window.localStorage)');
-
-        await win.loadURL('app://local/index.html');
-        const appLocalData = await win.webContents.executeJavaScript('Object.assign({}, window.localStorage)');
-
-        // Final Protocol Origin: app://localhost
-        await win.loadURL('app://localhost/index.html');
-        const currentData = await win.webContents.executeJavaScript('Object.assign({}, window.localStorage)');
-
-        if (!currentData['darkstar_vault'] && !currentData['migration_complete']) {
-          const origins = [fileData, appData, darkstarData, appLocalData];
-          let bestData = null;
-          let maxVaultSize = 0;
-          for (const data of origins) {
-            if (data && data['darkstar_vault']) {
-              const size = data['darkstar_vault'].length;
-              if (size > maxVaultSize) {
-                maxVaultSize = size;
-                bestData = data;
-              }
-            }
-          }
-          if (bestData) {
-            for (const key of Object.keys(bestData)) {
-              await win.webContents.executeJavaScript(`window.localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(bestData[key])});`);
-            }
-            await win.webContents.executeJavaScript(`window.localStorage.setItem('vault_recovered_notice', 'true');`);
-          }
-          // Persistence of migration state to prevent redundant execution
-          await win.webContents.executeJavaScript(`window.localStorage.setItem('migration_complete', 'true');`);
-        }
-      } catch (_e) {
-        console.error('Migration Sequence Failed:', _e);
-        await win.loadURL('app://localhost/index.html');
-      } finally {
-        win.show();
-      }
-    })();
+    win.loadURL('app://localhost/index.html');
   }
 }
 
@@ -237,6 +188,9 @@ app.whenReady().then(async () => {
   await cleanEngineRuntime();
   protocol.handle('app', async (request) => {
     const url = new URL(request.url);
+    if (url.hostname !== 'localhost') {
+      return new Response('Forbidden', { status: 403 });
+    }
     let pathname = url.pathname;
     if (pathname === '/' || pathname === '') pathname = '/index.html';
     const distPath = path.resolve(__dirname, '..', '..', 'dist', 'darkstar', 'browser');
