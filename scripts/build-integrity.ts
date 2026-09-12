@@ -23,10 +23,13 @@ function hashFile(fullPath: string, relPath: string) {
 }
 
 // 1. Electron Main / Preload Runtime
-const electronFiles = ['main.js', 'preload.js', 'preload_handshake.js', 'trust-anchor.js'];
-electronFiles.forEach((file) => {
-  hashFile(path.join(electronDistPath, file), `electron/${file}`);
-});
+if (fs.existsSync(electronDistPath)) {
+  for (const file of fs.readdirSync(electronDistPath)) {
+    if (file.endsWith('.js')) {
+      hashFile(path.join(electronDistPath, file), `electron/${file}`);
+    }
+  }
+}
 
 // 2. Angular Renderer Distribution (JS, HTML, CSS)
 function scanDirectory(dir: string): string[] {

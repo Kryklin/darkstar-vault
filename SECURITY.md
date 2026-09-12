@@ -22,8 +22,8 @@ Darkstar Vault is a defense-grade sovereign security enclave. We prioritize the 
 Darkstar Vault interfaces directly with the native sovereign **D-ARX-512** cryptographic core from [kryklin/darkstar](https://github.com/Kryklin/darkstar). Our security architecture enforces:
 
 - **Zero-Knowledge Memory Architecture**: Master keys, passphrases, and decrypted payloads exist solely in volatile, scrubbed execution memory and are never serialized to unencrypted disk caches.
-- **Hardware Enclave Binding**: High-assurance authentication leverages platform secure enclaves (TPM 2.0 via Windows Hello, Apple Secure Enclave via Touch ID / Face ID, and Android BiometricPrompt).
-- **OS-Level Secret Storage**: Cached session credentials utilize Electron `safeStorage` (Windows DPAPI, macOS Keychain, Linux Libsecret) ensuring process-isolated protection.
+- **Platform Biometric Integration**: High-assurance user authentication interfaces with platform authenticators (Windows Hello, Touch ID / Face ID, and Android BiometricPrompt) via standard FIDO2 / WebAuthn protocols with User Presence and User Verification enforcement.
+- **OS-Backed Secure Storage**: Native WebAuthn registries and cached session credentials utilize platform-provided credential protection via Electron `safeStorage` (Windows DPAPI, macOS Keychain, Linux secret-service). Storage strictly fails closed if OS-backed encryption is unavailable or fails decryption.
 - **Pure Native Delegation**: 100% of stream cipher permutation, key schedule expansion, and CTR keystream operations are executed by pre-compiled native `d-arx` binaries with runtime binary signature and SHA-512 integrity checks.
 - **Air-Gapped Operational Model**: Supports end-to-end air-gapped data transfers via animated QR-code streams and steganographic data carriers.
 
@@ -33,7 +33,7 @@ Darkstar Vault interfaces directly with the native sovereign **D-ARX-512** crypt
 
 | Version | Supported | Security Standard | Enclave Isolation |
 | :--- | :--- | :--- | :--- |
-| **3.0.x** | <img src="assets/icons/check.svg" width="13" height="13" align="absmiddle" alt="Active" /> Active | D-ARX-512 Core Stream Cipher / FIDO2 WebAuthn | Enforce Hardware Attestation |
+| **3.0.x** | <img src="assets/icons/check.svg" width="13" height="13" align="absmiddle" alt="Active" /> Active | D-ARX-512 Core Stream Cipher / FIDO2 WebAuthn | Platform-Enforced User Verification |
 | **< 3.0** | <img src="assets/icons/cross.svg" width="13" height="13" align="absmiddle" alt="End of Life" /> End of Life | Legacy Pre-release Implementations | Deprecated |
 
 ---
@@ -67,7 +67,10 @@ If you discover an architectural weakness, memory leakage vector, or cryptograph
 
 - **No Backdoors**: Darkstar Vault contains no administrative backdoors, master bypass keys, or escrow mechanisms.
 - **Zero Telemetry**: We collect zero telemetry, analytical beacons, network tracking, or usage metrics.
-- **Fail-Closed Runtime Integrity**: Packaged application releases enforce an embedded Ed25519 Trust Anchor over all runtime bundles (Electron and Angular renderer JS). Unsigned manifests or checksum discrepancies halt execution immediately.
+- **Fail-Closed Runtime Integrity**: Packaged application releases enforce an embedded Ed25519 Trust Anchor over all runtime bundles (Electron main/preload and Angular renderer JS chunks). Unsigned manifests or checksum discrepancies halt execution immediately without fallback.
+- **OS-Backed Secure Storage**: Native WebAuthn credentials and session tokens are protected using platform-provided credential protection via Electron `safeStorage` (Windows DPAPI, macOS Keychain, Linux secret-service). The system fails closed: if OS encryption is unavailable or fails decryption, access is immediately halted and never falls open to plaintext.
+- **WebAuthn Verification & Mutability Ordering**: WebAuthn assertions enforce strict ephemeral origin matching, RP-ID verification, User Presence (`UP`) and User Verification (`UV`) flag validation, cryptographic challenge matching, and ECDSA P-256 signature verification against native credentials. Sign counter updates are committed to persistent storage strictly after cryptographic signature verification passes, preventing counter advancement or state corruption via invalid assertions. (Note: hardware attestation statements are not verified; authenticator attachment is configured to platform mode).
+- **Authenticated Streaming Pipeline (v2 DARX-STRM)**: Large files and streamed binaries strictly enforce the v2 authenticated container format, cryptographically binding the stream identity, chunk index, chunk length, total chunk count, and total byte size to each chunk payload. Any chunk reordering, deletion, duplication, or outer metadata tampering fails closed. Backward compatibility for unauthenticated legacy v1 (`dArxChunked`) containers and unchunked blobs has been completely dropped to eliminate downgrade risks; attempts to decrypt legacy containers fail closed with an explicit instruction to re-encrypt using v2 DARX-STRM.
 - **Build & Release Signing Lifecycle**: Manifest signing keys are strictly isolated. Local release packaging loads credentials from developer-isolated `.env` files, while official production releases utilize CI runner secret injection and dedicated signing infrastructure/HSMs. Private keys are never committed to the repository.
 - **Fully Verifiable Builds**: All source files and build pipelines produce verifiable artifacts with deterministic SHA-256 / SHA-512 integrity checksums.
 

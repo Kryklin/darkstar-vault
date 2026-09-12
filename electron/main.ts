@@ -12,6 +12,7 @@ import squirrelStartup from 'electron-squirrel-startup';
 import { authenticator } from 'otplib';
 import { verifyIntegrity, isIntegrityVerified } from './integrity';
 import { DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, verifyEd25519Signature } from './trust-anchor';
+import { NativeWebAuthnRecord, enrollWebAuthnCredential, verifyWebAuthnAssertion } from './webauthn-verifier';
 
 const execFileAsync = promisify(execFile);
 
@@ -888,14 +889,7 @@ ipcMain.handle('darx-fetch-engine', async () => {
   }
 });
 
-// --- WebAuthn Native Proxy (Windows Hello Fix) ---
-
-interface NativeWebAuthnRecord {
-  idBase64: string;
-  publicKeyBase64: string; // DER SPKI
-  counter: number;
-  createdAt: number;
-}
+// --- WebAuthn Native Proxy (Windows Hello / Platform Authenticator) ---
 
 const getWebAuthnStoragePath = () => path.join(app.getPath('userData'), 'webauthn_registry.json');
 
@@ -912,7 +906,7 @@ async function loadNativeWebAuthnRegistry(): Promise<Record<string, NativeWebAut
   }
 
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('OS safeStorage hardware encryption is unavailable. Refusing to load credentials from unauthenticated storage.');
+    throw new Error('OS-backed secure storage (Electron safeStorage) is unavailable. Refusing to load credentials from unauthenticated storage.');
   }
 
   const jsonStr = safeStorage.decryptString(raw);
@@ -921,7 +915,7 @@ async function loadNativeWebAuthnRegistry(): Promise<Record<string, NativeWebAut
 
 async function saveNativeWebAuthnRegistry(registry: Record<string, NativeWebAuthnRecord>): Promise<void> {
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('OS safeStorage hardware encryption is unavailable. Refusing to persist WebAuthn credentials in unencrypted plaintext.');
+    throw new Error('OS-backed secure storage (Electron safeStorage) is unavailable. Refusing to persist WebAuthn credentials in unencrypted plaintext.');
   }
   const regPath = getWebAuthnStoragePath();
   const jsonStr = JSON.stringify(registry, null, 2);
@@ -1061,44 +1055,27 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
             };
           };
 
-          const clientDataArr = respData.response?.clientDataJSON;
-          if (!clientDataArr || !respData.rawId || !respData.publicKey) {
-            return resolve({ success: false, error: 'Native enrollment failed: malformed WebAuthn attestation structure.' });
-          }
-
-          let clientDataJson: Record<string, unknown>;
-          try {
-            clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
-            if (clientDataJson['type'] !== 'webauthn.create') {
-              return resolve({ success: false, error: 'Native enrollment failed: attestation type mismatch.' });
-            }
-            if (clientDataJson['origin'] !== expectedOrigin) {
-              return resolve({
-                success: false,
-                error: `Native enrollment failed: origin mismatch ('${clientDataJson['origin']}' does not match '${expectedOrigin}').`,
-              });
-            }
-          } catch {
-            return resolve({ success: false, error: 'Native enrollment failed: invalid clientDataJSON.' });
-          }
-
-          const idBase64 = Buffer.from(respData.rawId).toString('base64');
-          const pubKeyBase64 = Buffer.from(respData.publicKey).toString('base64');
           try {
             const registry = await loadNativeWebAuthnRegistry();
-            registry[idBase64] = {
-              idBase64,
-              publicKeyBase64: pubKeyBase64,
-              counter: 0,
-              createdAt: Date.now(),
-            };
-            await saveNativeWebAuthnRegistry(registry);
-            console.log(`[WebAuthn] Enrolled native credential record: ${idBase64.slice(0, 16)}...`);
+            const enrollRes = await enrollWebAuthnCredential({
+              rawId: respData.rawId,
+              publicKey: respData.publicKey,
+              clientDataJSON: respData.response?.clientDataJSON,
+              expectedOrigin,
+              registry,
+              onPersistRegistry: async (reg) => {
+                await saveNativeWebAuthnRegistry(reg);
+              },
+            });
+            if (!enrollRes.success) {
+              return resolve({ success: false, error: enrollRes.error });
+            }
+            console.log(`[WebAuthn] Enrolled native credential record successfully.`);
           } catch (saveErr) {
             console.error('[WebAuthn] Failed to persist native credential registry:', saveErr);
             return resolve({
               success: false,
-              error: `Failed to persist native credential in hardware-backed storage: ${(saveErr as Error).message}`,
+              error: `Failed to persist native credential in OS-backed secure storage: ${(saveErr as Error).message}`,
             });
           }
         }
@@ -1113,117 +1090,31 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
               signature?: number[];
             };
           };
-          const clientDataArr = respData.response?.clientDataJSON;
-          const authDataArr = respData.response?.authenticatorData;
-          const sigArr = respData.response?.signature;
 
-          if (!clientDataArr || !authDataArr || !sigArr || authDataArr.length < 37 || sigArr.length === 0) {
-            return resolve({ success: false, error: 'Native verification failed: malformed WebAuthn assertion structure.' });
-          }
-
-          let clientDataJson: Record<string, unknown>;
           try {
-            clientDataJson = JSON.parse(Buffer.from(clientDataArr).toString('utf8'));
-            if (clientDataJson['type'] !== 'webauthn.get') {
-              return resolve({ success: false, error: 'Native verification failed: assertion type mismatch.' });
+            const registry = await loadNativeWebAuthnRegistry();
+            const verifyRes = await verifyWebAuthnAssertion({
+              rawId: respData.rawId,
+              clientDataJSON: respData.response?.clientDataJSON,
+              authenticatorData: respData.response?.authenticatorData,
+              signature: respData.response?.signature,
+              expectedOrigin,
+              expectedRpId: (options as { publicKey?: { rpId?: string } }).publicKey?.rpId || 'localhost',
+              expectedChallenge: (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge,
+              registry,
+              onPersistRegistry: async (reg) => {
+                await saveNativeWebAuthnRegistry(reg);
+              },
+            });
+
+            if (!verifyRes.success) {
+              return resolve({ success: false, error: verifyRes.error });
             }
-
-            // Origin check: must strictly match ephemeral localhost origin
-            if (clientDataJson['origin'] !== expectedOrigin) {
-              return resolve({
-                success: false,
-                error: `Native verification failed: origin mismatch ('${clientDataJson['origin']}' does not match '${expectedOrigin}').`,
-              });
-            }
-          } catch {
-            return resolve({ success: false, error: 'Native verification failed: invalid clientDataJSON.' });
-          }
-
-          // RP ID Hash check: assert authenticator asserted for localhost
-          const expectedRpId = (options as { publicKey?: { rpId?: string } }).publicKey?.rpId || 'localhost';
-          const expectedRpIdHash = crypto.createHash('sha256').update(expectedRpId).digest();
-          const actualRpIdHash = Buffer.from(authDataArr.slice(0, 32));
-          if (!crypto.timingSafeEqual(actualRpIdHash, expectedRpIdHash)) {
-            return resolve({
-              success: false,
-              error: `Native verification failed: RP ID hash mismatch (expected '${expectedRpId}').`,
-            });
-          }
-
-          // Check flags at byte 32: bit 0 (UP), bit 2 (UV)
-          const flags = authDataArr[32];
-          const userPresent = (flags & 0x01) !== 0;
-          const userVerified = (flags & 0x04) !== 0;
-          if (!userPresent || !userVerified) {
-            return resolve({
-              success: false,
-              error: 'Native verification failed: authenticator did not assert User Verification (UV flag).',
-            });
-          }
-
-          // Challenge matching
-          const expectedChallenge = (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge;
-          if (expectedChallenge && clientDataJson['challenge']) {
-            const rawChal = Array.isArray(expectedChallenge) ? Buffer.from(expectedChallenge) : Buffer.from(expectedChallenge);
-            const chalUrlSafe = rawChal.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            if (clientDataJson['challenge'] !== chalUrlSafe) {
-              return resolve({
-                success: false,
-                error: 'Native verification failed: challenge mismatch (replay defense).',
-              });
-            }
-          }
-
-          // Native Credential Registry lookup (Renderer cannot dictate trusted public key)
-          const credentialIdBase64 = respData.rawId ? Buffer.from(respData.rawId).toString('base64') : '';
-          const registry = await loadNativeWebAuthnRegistry();
-          const nativeRecord = registry[credentialIdBase64];
-
-          if (!nativeRecord) {
-            return resolve({
-              success: false,
-              error: 'Native verification failed: credential ID is not enrolled in the native enclave registry.',
-            });
-          }
-
-          // Sign Counter tracking (Cloned authenticator replay defense)
-          const signCounter = Buffer.from(authDataArr).readUInt32BE(33);
-          if (signCounter > 0 && nativeRecord.counter > 0 && signCounter <= nativeRecord.counter) {
-            return resolve({
-              success: false,
-              error: `Native verification failed: authenticator sign counter roll-back detected (${signCounter} <= ${nativeRecord.counter}). Potential cloned authenticator.`,
-            });
-          }
-          if (signCounter > nativeRecord.counter) {
-            nativeRecord.counter = signCounter;
-            await saveNativeWebAuthnRegistry(registry);
-          }
-
-          // Cryptographic ECDSA P-256 signature verification against native stored public key
-          try {
-            const pubKeyBuf = Buffer.from(nativeRecord.publicKeyBase64, 'base64');
-            const clientDataHash = crypto.createHash('sha256').update(Buffer.from(clientDataArr)).digest();
-            const signedData = Buffer.concat([Buffer.from(authDataArr), clientDataHash]);
-
-            const keyObject = crypto.createPublicKey({
-              key: pubKeyBuf,
-              format: 'der',
-              type: 'spki',
-            });
-
-            const isSigVerified = crypto.verify('SHA256', signedData, keyObject, Buffer.from(sigArr));
-            if (!isSigVerified) {
-              return resolve({
-                success: false,
-                error: 'Native verification failed: authenticator signature mismatch against registered public key.',
-              });
-            }
-            console.log('[WebAuthn] Cryptographic assertion signature verified against native enclave registry.');
           } catch (verErr) {
-            console.warn('[WebAuthn] Assertion signature verification notice:', verErr);
+            console.error('[WebAuthn] Assertion verification error:', verErr);
             return resolve({
               success: false,
-              error: `Native verification failed: assertion signature check failed: ${(verErr as Error).message}`,
+              error: `Native verification failed: ${(verErr as Error).message}`,
             });
           }
         }

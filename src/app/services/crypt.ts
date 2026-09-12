@@ -92,102 +92,90 @@ export class CryptService {
 
   /**
    * Decrypts binary data (Uint8Array) via the D-ARX core.
-   * Authenticates streaming frames, validating streamId, chunk sequence, bounds, and total size.
-   * Seamlessly unpacks legacy chunked (v1) and unchunked blobs for backward compatibility.
+   * Strictly enforces authenticated v2 DARX-STRM streaming containers, validating
+   * streamId, chunk sequence, bounds, and total size across all frames.
+   * Backward compatibility for legacy unauthenticated formats (v1 dArxChunked
+   * and legacy unchunked blobs) is dropped to eliminate downgrade risks.
    */
   async decryptBinary(payload: Uint8Array, keyMaterial: string, hwid?: string): Promise<Uint8Array> {
     const payloadStr = new TextDecoder().decode(payload);
 
+    let parsed: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(payloadStr);
-
-      // Version 2: Authenticated Streaming Container
-      if (parsed && parsed.magic === 'DARX-STRM' && parsed.v === 2 && Array.isArray(parsed.chunks)) {
-        if (parsed.chunks.length !== parsed.totalChunks) {
-          throw new Error(`Streaming integrity violation: expected ${parsed.totalChunks} chunks, found ${parsed.chunks.length}.`);
-        }
-
-        const decryptedSlices: Uint8Array[] = [];
-        for (let idx = 0; idx < parsed.chunks.length; idx++) {
-          const chunkCiphertext = parsed.chunks[idx];
-          const { decrypted } = await this.decrypt(chunkCiphertext, '', keyMaterial, hwid);
-          const frame = JSON.parse(decrypted);
-
-          // Authenticate frame metadata: streamId, chunk index, chunk count, totalSize, chunkSize
-          if (
-            !frame ||
-            frame.s !== parsed.streamId ||
-            frame.i !== idx ||
-            frame.n !== parsed.totalChunks ||
-            (typeof frame.t === 'number' && frame.t !== parsed.totalSize) ||
-            (typeof frame.c === 'number' && frame.c !== parsed.chunkSize)
-          ) {
-            throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (metadata tampering detected).`);
-          }
-
-          const binaryStr = atob(frame.d);
-          if (typeof frame.l === 'number' && binaryStr.length !== frame.l) {
-            throw new Error(`Streaming integrity violation: chunk ${idx} length mismatch.`);
-          }
-
-          const sliceBytes = new Uint8Array(binaryStr.length);
-          for (let i = 0; i < binaryStr.length; i++) {
-            sliceBytes[i] = binaryStr.charCodeAt(i);
-          }
-          decryptedSlices.push(sliceBytes);
-        }
-
-        const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
-        if (typeof parsed.totalSize === 'number' && totalLength !== parsed.totalSize) {
-          throw new Error(`Streaming integrity violation: assembled stream size (${totalLength}) does not match authenticated container totalSize (${parsed.totalSize}).`);
-        }
-
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const slice of decryptedSlices) {
-          result.set(slice, offset);
-          offset += slice.length;
-        }
-        return result;
-      }
-
-      // Version 1 Legacy chunked container fallback
-      if (parsed && parsed.dArxChunked === true && Array.isArray(parsed.chunks)) {
-        const decryptedSlices: Uint8Array[] = [];
-        for (const chunk of parsed.chunks) {
-          const { decrypted } = await this.decrypt(chunk, '', keyMaterial, hwid);
-          const binaryStr = atob(decrypted);
-          const sliceBytes = new Uint8Array(binaryStr.length);
-          for (let i = 0; i < binaryStr.length; i++) {
-            sliceBytes[i] = binaryStr.charCodeAt(i);
-          }
-          decryptedSlices.push(sliceBytes);
-        }
-
-        const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const slice of decryptedSlices) {
-          result.set(slice, offset);
-          offset += slice.length;
-        }
-        return result;
-      }
-    } catch (parseOrIntegrityErr) {
-      if ((parseOrIntegrityErr as Error).message?.includes('Streaming integrity violation')) {
-        throw parseOrIntegrityErr;
-      }
-      // Fallback to legacy single-blob decryption if payload is not a chunked JSON envelope
+      parsed = JSON.parse(payloadStr);
+    } catch {
+      throw new Error('Streaming integrity violation: payload is not a valid container JSON.');
     }
 
-    const { decrypted } = await this.decrypt(payloadStr, '', keyMaterial, hwid);
-    const binaryStr = atob(decrypted);
-    const len = binaryStr.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
+    // Explicit rejection of legacy v1 containers (backward compatibility dropped)
+    if (parsed && typeof parsed === 'object' && parsed['dArxChunked'] === true) {
+      throw new Error(
+        'Streaming integrity violation: legacy unauthenticated v1 streaming format (dArxChunked) is deprecated and unsupported. Containers must be re-encrypted using authenticated v2 DARX-STRM.'
+      );
     }
-    return bytes;
+
+    // Version 2: Authenticated Streaming Container (Strictly Required)
+    if (!parsed || typeof parsed !== 'object' || parsed['magic'] !== 'DARX-STRM' || parsed['v'] !== 2 || !Array.isArray(parsed['chunks'])) {
+      throw new Error('Streaming integrity violation: invalid or unauthenticated container. Expected authenticated v2 DARX-STRM container.');
+    }
+
+    if (parsed['chunks'].length !== parsed['totalChunks']) {
+      throw new Error(`Streaming integrity violation: expected ${parsed['totalChunks']} chunks, found ${parsed['chunks'].length}.`);
+    }
+
+    const decryptedSlices: Uint8Array[] = [];
+    for (let idx = 0; idx < parsed['chunks'].length; idx++) {
+      const chunkCiphertext = parsed['chunks'][idx];
+      if (typeof chunkCiphertext !== 'string') {
+        throw new Error(`Streaming integrity violation: chunk ${idx} is not a valid ciphertext string.`);
+      }
+
+      const { decrypted } = await this.decrypt(chunkCiphertext, '', keyMaterial, hwid);
+      let frame: Record<string, unknown>;
+      try {
+        frame = JSON.parse(decrypted);
+      } catch {
+        throw new Error(`Streaming integrity violation: chunk ${idx} is not valid frame JSON.`);
+      }
+
+      // Authenticate frame metadata: streamId, chunk index, chunk count, totalSize, chunkSize
+      if (
+        !frame ||
+        frame['s'] !== parsed['streamId'] ||
+        frame['i'] !== idx ||
+        frame['n'] !== parsed['totalChunks'] ||
+        (typeof frame['t'] === 'number' && frame['t'] !== parsed['totalSize']) ||
+        (typeof frame['c'] === 'number' && frame['c'] !== parsed['chunkSize'])
+      ) {
+        throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (metadata tampering detected).`);
+      }
+
+      const binaryStr = atob(frame['d'] as string);
+      if (typeof frame['l'] === 'number' && binaryStr.length !== frame['l']) {
+        throw new Error(`Streaming integrity violation: chunk ${idx} length mismatch.`);
+      }
+
+      const sliceBytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        sliceBytes[i] = binaryStr.charCodeAt(i);
+      }
+      decryptedSlices.push(sliceBytes);
+    }
+
+    const totalLength = decryptedSlices.reduce((sum, s) => sum + s.length, 0);
+    if (typeof parsed['totalSize'] === 'number' && totalLength !== parsed['totalSize']) {
+      throw new Error(
+        `Streaming integrity violation: assembled stream size (${totalLength}) does not match authenticated container totalSize (${parsed['totalSize']}).`
+      );
+    }
+
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const slice of decryptedSlices) {
+      result.set(slice, offset);
+      offset += slice.length;
+    }
+    return result;
   }
 
   /**
