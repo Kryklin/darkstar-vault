@@ -54,7 +54,7 @@ const pkg = require('../package.json');
 
     new inquirer.Separator(chalk.dim('─── Testing & Verification ───────────────────────────────')),
     { name: chalk.cyan('  🧪  Run Angular (Karma) Unit Tests'), value: 'karma' },
-    { name: chalk.cyan('  🔐  Verify Native Crypto Engines'), value: 'verify-engines' },
+    { name: chalk.cyan('  🔐  Fetch & Verify Native Crypto Engines (from Releases)'), value: 'verify-engines' },
     { name: chalk.green('  ⚖️   Run License Compliance Audit'), value: 'license-audit' },
     { name: chalk.yellow('  🕵️   Run Full Security Audit'), value: 'audit' },
 
@@ -189,7 +189,33 @@ const pkg = require('../package.json');
     spinner.stop();
 
     if (missing.length === 0) {
-      if (interactive) console.log(chalk.bold.green('\n✨ All development tools are installed! ✨\n'));
+      // Check native crypto engine in ./bin
+      const ext = process.platform === 'win32' ? '.exe' : '';
+      const binDir = path.resolve(__dirname, '..', 'bin');
+      const rustBin = path.join(binDir, `d-arx-512${ext}`);
+      const aspAlias = path.join(binDir, `d-asp${ext}`);
+      const hasEngine = fs.existsSync(rustBin) || fs.existsSync(aspAlias);
+
+      if (!hasEngine) {
+        if (interactive) {
+          console.log(chalk.yellow('\n⚠ Native Darkstar Crypto Engine is not installed in ./bin/'));
+          const { fetchNow } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'fetchNow',
+              message: 'Download native ML-KEM-1024 / ARX-512 engine from Kryklin/darkstar releases now?',
+              default: true,
+            },
+          ]);
+          if (fetchNow) {
+            await execa('npx', ['tsx', 'scripts/fetch-engines.ts'], { stdio: 'inherit', preferLocal: true });
+          }
+        } else {
+          await ensureEnginesPresent();
+        }
+      }
+
+      if (interactive) console.log(chalk.bold.green('\n✨ All development tools and engines are operational! ✨\n'));
       return true;
     }
 
@@ -232,6 +258,21 @@ const pkg = require('../package.json');
     }
 
     return false;
+  }
+
+  /**
+   * Ensures native crypto engine binaries from Kryklin/darkstar releases are downloaded in ./bin.
+   */
+  async function ensureEnginesPresent() {
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const binDir = path.resolve(__dirname, '..', 'bin');
+    const rustBin = path.join(binDir, `d-arx-512${ext}`);
+    const aspAlias = path.join(binDir, `d-asp${ext}`);
+
+    if (!fs.existsSync(rustBin) && !fs.existsSync(aspAlias)) {
+      console.log(chalk.cyan('\n🔐 Native crypto engine missing in ./bin. Fetching from Kryklin/darkstar releases...'));
+      await execa('npx', ['tsx', 'scripts/fetch-engines.ts'], { stdio: 'inherit', preferLocal: true });
+    }
   }
 
   // --- Main Execution Loop ---
@@ -353,6 +394,7 @@ const pkg = require('../package.json');
             await runShell('Building', CMD.BUILD, { showOutput: true });
             break;
           case 'package':
+            await ensureEnginesPresent();
             console.log(chalk.yellow('ℹ Building before packaging...'));
             await runShell('Building', CMD.BUILD, { showOutput: true });
             await runShell('Packaging', CMD.PACKAGE, { clear: true, showOutput: true });
@@ -360,10 +402,12 @@ const pkg = require('../package.json');
           case 'publish':
             if (!process.env.GITHUB_TOKEN && !process.env.GH_TOKEN) {
               console.log(chalk.red.bold('\n⚠️  Error: GITHUB_TOKEN not found in environment.'));
+              console.log(chalk.yellow('Publishing requires a GitHub Personal Access Token.'));
               console.log(chalk.yellow('Please create a .env file in the root directory with:'));
               console.log(chalk.cyan('GITHUB_TOKEN=your_token_here\n'));
               break;
             }
+            await ensureEnginesPresent();
             console.log(chalk.yellow('ℹ Building before publishing...'));
             await runShell('Building', CMD.BUILD, { showOutput: true });
             await runShell('Publishing', CMD.PUBLISH, { clear: false, showOutput: true });

@@ -71,64 +71,21 @@
           <h2>Core Protection</h2>
           <div class="setting-row">
             <div class="setting-label">
-              <span class="title">Cryptographic Engine</span>
-              <span class="description">Select the backend engine executing D-KASP-512 transformations. All run strictly offline.</span>
+              <span class="title">D-ARX-512 Core Engine</span>
+              <span class="description">Post-Quantum ML-KEM-1024 and ARX-512 native core from Darkstar releases. Operates strictly offline.</span>
             </div>
-            <mat-form-field appearance="outline">
-              <mat-label>Execution Backend</mat-label>
-              <mat-select [(ngModel)]="dkaspEngine">
-                <mat-select-trigger>
-                  <div class="engine-option-trigger">
-                    @if (dkaspEngine === 'rust') {
-                      <i class="devicon-rust-plain colored"></i>
-                    }
-                    @if (dkaspEngine === 'go') {
-                      <i class="devicon-go-plain colored"></i>
-                    }
-                    @if (dkaspEngine === 'c') {
-                      <i class="devicon-c-plain colored"></i>
-                    }
-                    @if (dkaspEngine === 'node') {
-                      <i class="devicon-nodejs-plain colored"></i>
-                    }
-                    @if (dkaspEngine === 'python') {
-                      <i class="devicon-python-plain colored"></i>
-                    }
-                    <span style="margin-left: 8px; text-transform: capitalize">{{ dkaspEngine }}</span>
-                  </div>
-                </mat-select-trigger>
-                <mat-option value="rust">
-                  <div class="engine-option">
-                    <i class="devicon-rust-plain colored"></i>
-                    <span>Rust</span>
-                  </div>
-                </mat-option>
-                <mat-option value="go">
-                  <div class="engine-option">
-                    <i class="devicon-go-plain colored"></i>
-                    <span>Go</span>
-                  </div>
-                </mat-option>
-                <mat-option value="c">
-                  <div class="engine-option">
-                    <i class="devicon-c-plain colored"></i>
-                    <span>C</span>
-                  </div>
-                </mat-option>
-                <mat-option value="node">
-                  <div class="engine-option">
-                    <i class="devicon-nodejs-plain colored"></i>
-                    <span>Node.js</span>
-                  </div>
-                </mat-option>
-                <mat-option value="python">
-                  <div class="engine-option">
-                    <i class="devicon-python-plain colored"></i>
-                    <span>Python</span>
-                  </div>
-                </mat-option>
-              </mat-select>
-            </mat-form-field>
+            <div class="engine-status-box" style="display: flex; align-items: center; gap: 12px;">
+              <span class="engine-badge" [style.color]="engineOperational ? '#00e676' : '#ff5252'" style="font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                <mat-icon style="font-size: 20px; width: 20px; height: 20px;">{{ engineOperational ? 'check_circle' : 'warning' }}</mat-icon>
+                {{ engineOperational ? 'Operational (D-ARX-512)' : 'Engine Not Found' }}
+              </span>
+              @if (isElectron) {
+                <button mat-stroked-button color="primary" [disabled]="isCheckingEngine" (click)="updateOrFetchEngine()">
+                  <mat-icon>{{ isCheckingEngine ? 'sync' : 'cloud_download' }}</mat-icon>
+                  {{ isCheckingEngine ? 'Syncing...' : 'Update / Fetch Core' }}
+                </button>
+              }
+            </div>
           </div>
 
           <div class="setting-row">

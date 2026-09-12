@@ -440,16 +440,29 @@ ipcMain.handle('open-backup', async (_event, filePath: string) => {
   }
 });
 
-import { execFile } from 'child_process';
+import * as crypto from 'crypto';
+import { execFile, execSync } from 'child_process';
 import { promisify } from 'util';
 const execFileAsync = promisify(execFile);
 
-async function runDAsPCommand(engine: string, args: string[]): Promise<unknown> {
+interface ReleaseAsset {
+  name: string;
+  browser_download_url: string;
+  size: number;
+}
+
+interface ReleaseData {
+  tag_name: string;
+  name: string;
+  assets: ReleaseAsset[];
+}
+
+/**
+ * Resolves candidate search paths for native crypto engine binaries
+ */
+function getEngineCandidatePaths(): string[] {
   const isWindows = process.platform === 'win32';
   const ext = isWindows ? '.exe' : '';
-  let cmd = '';
-  let execArgs: string[] = [];
-
   const candidateSearchPaths: string[] = [];
 
   // 1. Explicit environment override
@@ -457,36 +470,167 @@ async function runDAsPCommand(engine: string, args: string[]): Promise<unknown> 
     candidateSearchPaths.push(process.env.DARKSTAR_ENGINE_PATH);
   }
 
-  // 2. Packaged resources path
+  // 2. User Data directory (downloaded or installed at runtime)
+  const userDataBinDir = path.join(app.getPath('userData'), 'bin');
+  candidateSearchPaths.push(
+    path.join(userDataBinDir, `d-arx-512${ext}`),
+    path.join(userDataBinDir, `d-asp${ext}`),
+  );
+
+  // 3. Packaged resources path
   if (app.isPackaged) {
     candidateSearchPaths.push(
+      path.join(process.resourcesPath, `d-arx-512${ext}`),
       path.join(process.resourcesPath, `d-asp${ext}`),
       path.join(process.resourcesPath, `main${ext}`),
       path.join(process.resourcesPath, `dasp${ext}`),
+      path.join(process.resourcesPath, 'bin', `d-arx-512${ext}`),
       path.join(process.resourcesPath, 'bin', `d-asp${ext}`),
     );
   }
 
-  // 3. Local workspace ./bin directory
+  // 4. Local workspace ./bin directory
   const rootBinDir = path.resolve(__dirname, '..', '..', 'bin');
   candidateSearchPaths.push(
+    path.join(rootBinDir, `d-arx-512${ext}`),
     path.join(rootBinDir, `d-asp${ext}`),
     path.join(rootBinDir, `main${ext}`),
     path.join(rootBinDir, `dasp${ext}`),
   );
 
-  // 4. Fallback: local development tree if cloned alongside
-  const legacyBasePath = path.resolve(__dirname, '..', '..', 'd-asp');
-  if (engine === 'rust') {
-    candidateSearchPaths.push(path.join(legacyBasePath, 'rust', 'target', 'release', `d-asp${ext}`));
-  } else if (engine === 'go') {
-    candidateSearchPaths.push(path.join(legacyBasePath, 'go', `main${ext}`));
-  } else if (engine === 'c') {
-    candidateSearchPaths.push(path.join(legacyBasePath, 'c', `dasp${ext}`));
+  return candidateSearchPaths;
+}
+
+/**
+ * Downloads and extracts the latest native crypto engine from Kryklin/darkstar GitHub releases.
+ */
+async function fetchEngineFromReleases(): Promise<string> {
+  const isWindows = process.platform === 'win32';
+  const ext = isWindows ? '.exe' : '';
+
+  // Target directory: rootBinDir if dev, userDataBinDir if packaged
+  const targetBinDir = app.isPackaged
+    ? path.join(app.getPath('userData'), 'bin')
+    : path.resolve(__dirname, '..', '..', 'bin');
+
+  if (!fsSync.existsSync(targetBinDir)) {
+    fsSync.mkdirSync(targetBinDir, { recursive: true });
   }
 
-  // Find first existing executable
-  const foundBinary = candidateSearchPaths.find((p) => {
+  console.log(`[Darkstar Engine] Querying GitHub releases for platform ${process.platform}...`);
+  const headers: Record<string, string> = {
+    'User-Agent': 'darkstar-vault-electron',
+    Accept: 'application/vnd.github.v3+json',
+  };
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (token && !token.includes('your_') && !token.includes('placeholder') && token.length > 20) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  let res = await fetch('https://api.github.com/repos/Kryklin/darkstar/releases/latest', { headers });
+  if (res.status === 401 && headers['Authorization']) {
+    delete headers['Authorization'];
+    res = await fetch('https://api.github.com/repos/Kryklin/darkstar/releases/latest', { headers });
+  }
+  if (!res.ok) {
+    throw new Error(`GitHub releases API error: ${res.status} ${res.statusText}`);
+  }
+
+  const release = (await res.json()) as ReleaseData;
+  const assetKeyword = isWindows ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
+
+  let targetAsset = release.assets.find(
+    (a) => a.name.toLowerCase().includes('rust-engine') && a.name.toLowerCase().includes(assetKeyword),
+  );
+  if (!targetAsset) {
+    targetAsset = release.assets.find(
+      (a) => a.name.toLowerCase().includes('engine') && a.name.toLowerCase().includes(assetKeyword),
+    );
+  }
+
+  if (!targetAsset) {
+    throw new Error(`No pre-compiled engine binary archive found in release ${release.tag_name} for platform ${process.platform}`);
+  }
+
+  console.log(`[Darkstar Engine] Downloading ${targetAsset.name}...`);
+  const archivePath = path.join(targetBinDir, targetAsset.name);
+  let downloadRes = await fetch(targetAsset.browser_download_url, { headers });
+  if (downloadRes.status === 401 && headers['Authorization']) {
+    delete headers['Authorization'];
+    downloadRes = await fetch(targetAsset.browser_download_url, { headers });
+  }
+  if (!downloadRes.ok) {
+    throw new Error(`Failed to download ${targetAsset.name}: ${downloadRes.statusText}`);
+  }
+
+  const arrayBuffer = await downloadRes.arrayBuffer();
+  fsSync.writeFileSync(archivePath, Buffer.from(arrayBuffer));
+
+  console.log(`[Darkstar Engine] Extracting archive...`);
+  try {
+    if (archivePath.endsWith('.zip')) {
+      execSync(`tar -xf "${archivePath}" -C "${targetBinDir}"`);
+    } else if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+      execSync(`tar -xzf "${archivePath}" -C "${targetBinDir}"`);
+    }
+  } catch (_tarErr) {
+    if (isWindows) {
+      execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${targetBinDir}' -Force"`);
+    } else {
+      throw _tarErr;
+    }
+  } finally {
+    if (fsSync.existsSync(archivePath)) {
+      try {
+        fsSync.unlinkSync(archivePath);
+      } catch {}
+    }
+  }
+
+  const rustBin = path.join(targetBinDir, `d-arx-512${ext}`);
+  const aspAlias = path.join(targetBinDir, `d-asp${ext}`);
+
+  // Maintain alias parity so either binary name works
+  if (fsSync.existsSync(rustBin) && !fsSync.existsSync(aspAlias)) {
+    try {
+      fsSync.copyFileSync(rustBin, aspAlias);
+    } catch {}
+  } else if (fsSync.existsSync(aspAlias) && !fsSync.existsSync(rustBin)) {
+    try {
+      fsSync.copyFileSync(aspAlias, rustBin);
+    } catch {}
+  }
+
+  const activeBin = fsSync.existsSync(rustBin) ? rustBin : aspAlias;
+  if (!fsSync.existsSync(activeBin)) {
+    throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-asp${ext} was found in ${targetBinDir}`);
+  }
+
+  // Self-test verification
+  await execFileAsync(activeBin, ['test']);
+  console.log(`[Darkstar Engine] Operational native engine ready: ${activeBin}`);
+  return activeBin;
+}
+
+/**
+ * Sanitizes HWID into an even-length hex string required by the Rust crypto engine.
+ */
+function sanitizeHwid(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
+    return trimmed.toLowerCase();
+  }
+  return crypto.createHash('sha256').update(trimmed).digest('hex');
+}
+
+async function runDAsPCommand(args: string[]): Promise<unknown> {
+  const isWindows = process.platform === 'win32';
+  const ext = isWindows ? '.exe' : '';
+
+  const candidateSearchPaths = getEngineCandidatePaths();
+
+  let foundBinary = candidateSearchPaths.find((p) => {
     try {
       return fsSync.existsSync(p);
     } catch {
@@ -494,45 +638,26 @@ async function runDAsPCommand(engine: string, args: string[]): Promise<unknown> 
     }
   });
 
-  if (engine === 'node') {
-    const nodeScript = [
-      path.join(process.resourcesPath, 'main.js'),
-      path.join(rootBinDir, 'main.js'),
-      path.join(legacyBasePath, 'node', 'dist', 'main.js'),
-    ].find((p) => fsSync.existsSync(p));
-
-    if (nodeScript) {
-      cmd = 'node';
-      execArgs = [nodeScript, ...args];
-    }
-  } else if (engine === 'python') {
-    const pyScript = [
-      path.join(process.resourcesPath, 'dasp.py'),
-      path.join(rootBinDir, 'dasp.py'),
-      path.join(legacyBasePath, 'python', 'dasp.py'),
-    ].find((p) => fsSync.existsSync(p));
-
-    if (pyScript) {
-      cmd = 'python';
-      execArgs = [pyScript, ...args];
+  // If native binary is missing, auto-fetch from Kryklin/darkstar releases!
+  if (!foundBinary) {
+    try {
+      console.log('[Darkstar Engine] Native D-ARX core missing. Auto-fetching from Kryklin/darkstar releases...');
+      foundBinary = await fetchEngineFromReleases();
+    } catch (fetchErr: unknown) {
+      console.error('[Darkstar Engine] Auto-fetch failed:', (fetchErr as Error).message);
     }
   }
 
-  if (!cmd && foundBinary) {
-    cmd = foundBinary;
-    execArgs = args;
-  }
-
-  if (!cmd) {
+  if (!foundBinary) {
     throw new Error(
-      `D-ASP Crypto Engine (${engine}) executable not found.\n` +
-      `Please ensure the native crypto engine is installed in ./bin/d-asp${ext} or specify DARKSTAR_ENGINE_PATH in .env.\n` +
+      `D-ARX-512 Native Core executable not found.\n` +
+      `Please ensure the engine is installed in ./bin/d-arx-512${ext} or specify DARKSTAR_ENGINE_PATH in .env.\n` +
       `Engine binaries can be downloaded from: https://github.com/Kryklin/darkstar/releases`
     );
   }
 
   try {
-    const { stdout } = await execFileAsync(cmd, execArgs);
+    const { stdout } = await execFileAsync(foundBinary, args);
     try {
       return JSON.parse(stdout);
     } catch {
@@ -540,41 +665,82 @@ async function runDAsPCommand(engine: string, args: string[]): Promise<unknown> 
     }
   } catch (e: unknown) {
     const err = e as Error & { stderr?: string };
-    throw new Error(`D-ASP Engine (${engine}) failed: ${err.stderr || err.message}`);
+    throw new Error(`D-ARX Core failed: ${err.stderr || err.message}`);
   }
 }
 
-ipcMain.handle('dasp-encrypt', async (_event, payload: string, pkHex: string, engine: string, hwid?: string) => {
+ipcMain.handle('dasp-encrypt', async (_event, payload: string, pkHex: string, _engine?: string, hwid?: string) => {
+  const cleanHwid = sanitizeHwid(hwid);
   const args: string[] = ['--diagnostic'];
-  if (hwid) {
-    args.push('--hwid', hwid);
+  if (cleanHwid) {
+    args.push('--hwid', cleanHwid);
   }
   args.push('encrypt', payload, pkHex);
 
   try {
-    return await runDAsPCommand(engine, args);
+    return await runDAsPCommand(args);
   } catch (error: unknown) {
     const err = error as { stderr?: string; message?: string };
     const msg = err.stderr || err.message || String(error);
-    console.error(`D-ASP Engine (${engine}) failed:`, msg);
-    throw new Error(`D-ASP Engine (${engine}) failed: ${msg}`);
+    console.error('D-ARX Core encryption failed:', msg);
+    throw new Error(`D-ARX Core encryption failed: ${msg}`);
   }
 });
 
-ipcMain.handle('dasp-decrypt', async (_event, data: string, rk: string, skHex: string, engine: string, hwid?: string) => {
+ipcMain.handle('dasp-decrypt', async (_event, data: string, _rk: string, skHex: string, _engine?: string, hwid?: string) => {
+  const cleanHwid = sanitizeHwid(hwid);
   const args: string[] = ['--diagnostic'];
-  if (hwid) {
-    args.push('--hwid', hwid);
+  if (cleanHwid) {
+    args.push('--hwid', cleanHwid);
   }
-  args.push('decrypt', data, skHex); // rk parameter is legacy and maintained for signature parity
+  args.push('decrypt', data, skHex);
 
   try {
-    return await runDAsPCommand(engine, args);
+    return await runDAsPCommand(args);
   } catch (error: unknown) {
     const err = error as { stderr?: string; message?: string };
     const msg = err.stderr || err.message || String(error);
-    console.error(`D-ASP Engine (${engine}) failed:`, msg);
-    throw new Error(`D-ASP Engine (${engine}) failed: ${msg}`);
+    console.error('D-ARX Core decryption failed:', msg);
+    throw new Error(`D-ARX Core decryption failed: ${msg}`);
+  }
+});
+
+ipcMain.handle('dasp-check-engine', async () => {
+  const candidatePaths = getEngineCandidatePaths();
+  const existingPath = candidatePaths.find((p) => {
+    try {
+      return fsSync.existsSync(p);
+    } catch {
+      return false;
+    }
+  });
+
+  if (!existingPath) {
+    return { operational: false, error: 'Engine binary not found in candidate paths' };
+  }
+
+  try {
+    await execFileAsync(existingPath, ['test']);
+    return {
+      operational: true,
+      binaryPath: existingPath,
+      name: path.basename(existingPath),
+    };
+  } catch (e: unknown) {
+    return {
+      operational: false,
+      binaryPath: existingPath,
+      error: (e as Error).message,
+    };
+  }
+});
+
+ipcMain.handle('dasp-fetch-engine', async () => {
+  try {
+    const binaryPath = await fetchEngineFromReleases();
+    return { success: true, binaryPath };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 });
 

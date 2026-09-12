@@ -5,24 +5,26 @@ const fs = require('fs');
 
 const ext = process.platform === 'win32' ? '.exe' : '';
 
-// Resolve native engine resources from ./bin or environment if available
-const candidateResources = [
-  path.join(__dirname, `bin/d-asp${ext}`),
-  path.join(__dirname, `bin/main${ext}`),
-  path.join(__dirname, `bin/dasp${ext}`),
-  path.join(__dirname, 'bin/main.js'),
-  path.join(__dirname, 'bin/dasp.py'),
-  path.join(__dirname, 'bin/dasp_crypto.wasm'),
-  process.env.DARKSTAR_ENGINE_PATH,
-].filter(Boolean);
+function getExtraResources() {
+  const candidateResources = [
+    path.join(__dirname, `bin/d-arx-512${ext}`),
+    path.join(__dirname, `bin/d-asp${ext}`),
+    path.join(__dirname, `bin/main${ext}`),
+    path.join(__dirname, `bin/dasp${ext}`),
+    path.join(__dirname, 'bin/main.js'),
+    path.join(__dirname, 'bin/dasp.py'),
+    path.join(__dirname, 'bin/dasp_crypto.wasm'),
+    process.env.DARKSTAR_ENGINE_PATH,
+  ].filter(Boolean);
 
-const extraResources = candidateResources.filter((p) => fs.existsSync(p));
+  return candidateResources.filter((p) => fs.existsSync(p));
+}
 
 module.exports = {
   packagerConfig: {
     asar: true,
     icon: path.resolve(__dirname, 'public/favicon'),
-    extraResource: extraResources,
+    extraResource: getExtraResources(),
   },
   rebuildConfig: {},
   makers: [
@@ -67,6 +69,22 @@ module.exports = {
     }),
   ],
   hooks: {
+    generateAssets: async (forgeConfig) => {
+      const ext = process.platform === 'win32' ? '.exe' : '';
+      const binDir = path.join(__dirname, 'bin');
+      const rustBin = path.join(binDir, `d-arx-512${ext}`);
+      const aspAlias = path.join(binDir, `d-asp${ext}`);
+
+      if (!fs.existsSync(rustBin) && !fs.existsSync(aspAlias)) {
+        console.log('\n🔐 Engine binaries missing in ./bin. Fetching from Kryklin/darkstar releases...');
+        const { execSync } = require('child_process');
+        execSync('npx tsx scripts/fetch-engines.ts', { stdio: 'inherit' });
+      }
+
+      if (forgeConfig && forgeConfig.packagerConfig) {
+        forgeConfig.packagerConfig.extraResource = getExtraResources();
+      }
+    },
     postMake: async (config, makeResults) => {
       const { execSync } = require('child_process');
       const fs = require('fs');

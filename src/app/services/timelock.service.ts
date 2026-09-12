@@ -40,7 +40,7 @@ export class TimeLockService {
     const seed = CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
 
     const keyHex = await this.computeDelay(seed, iterations, progressCallback);
-    const encryptedData = await this.crypt.encryptAES256GCMAsync(content, keyHex, 1000);
+    const { encryptedData } = await this.crypt.encrypt(content, keyHex);
 
     return {
       encryptedData,
@@ -54,7 +54,7 @@ export class TimeLockService {
 
   public async unlockNoteContent(encryptedData: string, metadata: TimeLockMetadata, progressCallback?: (p: number) => void): Promise<string> {
     const keyHex = await this.computeDelay(metadata.seedHex, metadata.iterations, progressCallback);
-    const decrypted = await this.crypt.decryptAES256GCMAsync(encryptedData, keyHex, 1000);
+    const { decrypted } = await this.crypt.decrypt(encryptedData, '', keyHex);
     if (!decrypted) {
       throw new Error('Failed to unlock time-locked note.');
     }

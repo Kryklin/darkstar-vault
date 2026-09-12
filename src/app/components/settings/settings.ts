@@ -61,17 +61,48 @@ export class Settings implements OnInit {
     this.vaultService.setBiometricForce(value);
   }
 
-  get dkaspEngine(): string {
-    return localStorage.getItem('dkasp_engine') || 'rust';
-  }
-
-  set dkaspEngine(value: string) {
-    localStorage.setItem('dkasp_engine', value);
-  }
+  engineOperational = true;
+  enginePath = '';
+  isCheckingEngine = false;
 
   ngOnInit() {
     if (this.isElectron) {
       this.updateResolvedBackupPath();
+      this.checkEngineStatus();
+    }
+  }
+
+  async checkEngineStatus() {
+    if (this.isElectron && window.electronAPI.dAsPCheckEngine) {
+      try {
+        const res = await window.electronAPI.dAsPCheckEngine();
+        this.ngZone.run(() => {
+          this.engineOperational = res.operational;
+          this.enginePath = res.binaryPath || '';
+        });
+      } catch {
+        this.ngZone.run(() => {
+          this.engineOperational = false;
+        });
+      }
+    }
+  }
+
+  async updateOrFetchEngine() {
+    if (!this.isElectron || !window.electronAPI.dAsPFetchEngine) return;
+    this.isCheckingEngine = true;
+    try {
+      const res = await window.electronAPI.dAsPFetchEngine();
+      if (res.success) {
+        this.openDialog('D-ARX Core Verified', `Operational D-ARX core binary ready at:\n${res.binaryPath}`, [{ label: 'OK', value: true }]);
+        await this.checkEngineStatus();
+      } else {
+        this.openDialog('Engine Download Failed', `Unable to acquire D-ARX release binary: ${res.error}`, [{ label: 'OK', value: true }]);
+      }
+    } catch (e: unknown) {
+      this.openDialog('Error', `Engine update failed: ${(e as Error).message}`, [{ label: 'OK', value: true }]);
+    } finally {
+      this.isCheckingEngine = false;
     }
   }
 
