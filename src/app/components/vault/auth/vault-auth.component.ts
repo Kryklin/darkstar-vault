@@ -142,7 +142,7 @@ export class VaultAuthComponent implements OnInit {
       data: {
         title: 'Quantum Security Upgrade',
         message:
-          'A security upgrade is available for your vault. Would you like to migrate your data to the D-KASP protocol for post-quantum protection?\n\nThis is a one-time process and is highly recommended.',
+          'A security upgrade is available for your vault. Would you like to migrate your data to the D-ARX protocol for post-quantum protection?\n\nThis is a one-time process and is highly recommended.',
         buttons: [
           { label: 'Later', value: false },
           { label: 'Migrate Now', value: true, color: 'primary' },

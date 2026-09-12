@@ -52,7 +52,7 @@ interface VaultContent {
 })
 /**
  * Core vault management service.
- * Handles persistence, identity lifecycle, and D-KASP protocol integration.
+ * Handles persistence, identity lifecycle, and D-ARX protocol integration.
  */
 export class VaultService {
   private crypt = inject(CryptService);

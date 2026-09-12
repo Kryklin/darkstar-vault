@@ -73,7 +73,7 @@ export class VaultFileService {
       throw new Error('No compatible storage layer available.');
     }
 
-    // Decrypt (Auto-detects D-KASP vs Legacy)
+    // Decrypt (Auto-detects D-ARX vs Legacy)
     const decryptedData = await this.crypt.decryptBinaryAuto(encryptedData, password);
 
     // Create Blob and trigger download

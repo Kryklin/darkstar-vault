@@ -45,7 +45,7 @@ export class ZorkEngine {
     kitchen: {
       id: 'kitchen',
       name: 'Kitchen',
-      description: 'A dark kitchen filled with the smell of old spices. On the table sits a d-kasp-512 encrypted leaflet.',
+      description: 'A dark kitchen filled with the smell of old spices. On the table sits a d-arx-512 encrypted leaflet.',
       exits: { out: 'south_of_house', west: 'living_room' },
       items: ['leaflet'],
     },

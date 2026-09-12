@@ -47,6 +47,11 @@ const RULES: ReplacementRule[] = [
   { pattern: /\bdspna\b/gi, replacement: 'darx', description: 'dspna -> darx' },
   { pattern: /\bdspn\b/gi, replacement: 'darx', description: 'dspn -> darx' },
   { pattern: /\bspna\b/gi, replacement: 'd-arx', description: 'spna -> d-arx' },
+
+  // Legacy D-KASP / ASP CASCADE variants
+  { pattern: /ASP CASCADE 16/g, replacement: 'D-ARX-512 CORE', description: 'ASP CASCADE 16 -> D-ARX-512 CORE' },
+  { pattern: /\bD-KASP\b/g, replacement: 'D-ARX', description: 'D-KASP -> D-ARX' },
+  { pattern: /\bd-kasp\b/g, replacement: 'd-arx', description: 'd-kasp -> d-arx' },
 ];
 
 const SCAN_DIRECTORIES = ['src', 'electron', 'scripts'];
