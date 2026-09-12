@@ -79,7 +79,9 @@ On mobile platforms (Android & iOS), **Capacitor** bridges the Angular web views
 
 Darkstar Vault is engineered with defense-in-depth hardware and operational countermeasures:
 
-- **Biometric Security Bridge (FIDO2 / WebAuthn)**: Native integration for Windows Hello, Touch ID, Face ID, and hardware security keys (YubiKey via USB/NFC/BLE).
+- **Biometric Security Bridge (FIDO2 / WebAuthn)**: Native integration for Windows Hello, Touch ID, Face ID, and hardware security keys (YubiKey via USB/NFC/BLE) with strict User Verification (UV) assertion enforcement.
+- **Zero Server-Side Vault Infrastructure**: The enclave operates with no remote backend or cloud database dependencies. Network interaction is strictly isolated to opt-in release engine acquisition and locked update channels.
+- **Cryptographic Datapath Integrity**: No dedicated persistent memory or RAM subsystem in the cryptographic datapath; pure ALU stream permutation operations enforce strict non-linear diffusion and confusion without secret-indexed memory lookups.
 - **Session Hardening & Zero-Plaintext Memory**: Session master keys are never stored in plaintext on disk; protected via OS-level hardware key stores (`safeStorage` / Keychain / KeyStore).
 - **TOTP Dual-Factor Quarantine**: Vault entries with TOTP protection remain in zeroed memory until secondary synchronous verification via `otplib` passes.
 - **Air-Gapped Data Exfiltration Protection**: Supports animated high-density visual QR transmission and steganographic data concealment (text and audio carriers).

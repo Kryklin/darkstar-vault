@@ -1,7 +1,16 @@
 interface BiometricResponse {
   success: boolean;
   data?: {
+    id?: string;
     rawId: number[];
+    type?: string;
+    response?: {
+      clientDataJSON?: number[];
+      attestationObject?: number[];
+      authenticatorData?: number[];
+      signature?: number[];
+      userHandle?: number[];
+    };
     [key: string]: unknown;
   };
   error?: string;

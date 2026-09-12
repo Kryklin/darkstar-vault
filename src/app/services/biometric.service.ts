@@ -100,7 +100,20 @@ export class BiometricService {
       if (window.electronAPI && window.electronAPI.biometricHandshake) {
         const response = await window.electronAPI.biometricHandshake({ action: 'get', publicKey });
         if (response.success && response.data) {
-          return true; // Simplified: assertion exists
+          const authData = response.data.response?.authenticatorData;
+          const sig = response.data.response?.signature;
+          // Verify structural presence of authenticatorData (minimum 37 bytes) and assertion signature
+          if (Array.isArray(authData) && authData.length >= 37 && Array.isArray(sig) && sig.length > 0) {
+            const flags = authData[32];
+            const userPresent = (flags & 0x01) !== 0;
+            const userVerified = (flags & 0x04) !== 0;
+            // Cryptographically require user verification (biometric or platform PIN assertion)
+            if (userPresent && userVerified) {
+              return true;
+            }
+            console.warn('Biometric handshake: Authenticator did not assert User Verification (UV flag).');
+            return false;
+          }
         }
         return false;
       }

@@ -107,15 +107,21 @@ export class BackupService {
       const backupData = await window.electronAPI.openBackup(filePath);
       if (!backupData) return { success: false, message: 'Failed to read backup file.' };
 
-      // 3. Very basic structural validation
-      // We expect a base64 encoded JSON string representing the Vault envelope
+      // 3. Authenticated envelope structure validation
+      let parsed: unknown;
       try {
-        const parsed = JSON.parse(backupData);
-        if (!parsed || !parsed.data) {
-          return { success: false, message: 'Invalid backup file format or corrupted payload.' };
-        }
-      } catch (_e) {
+        parsed = JSON.parse(backupData);
+      } catch {
         return { success: false, message: 'Invalid backup file format. Expected JSON storage envelope.' };
+      }
+
+      if (!parsed || typeof parsed !== 'object' || !('data' in parsed) || typeof (parsed as { data: unknown }).data !== 'string' || (parsed as { data: string }).data.trim().length === 0) {
+        return { success: false, message: 'Corrupt or invalid backup envelope: missing valid payload string.' };
+      }
+
+      const envelope = parsed as { data: string; s?: unknown };
+      if ('s' in envelope && typeof envelope.s !== 'boolean' && envelope.s !== undefined) {
+        return { success: false, message: 'Corrupt backup envelope: invalid safeStorage flag.' };
       }
 
       // 4. Inject

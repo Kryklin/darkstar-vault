@@ -27,6 +27,16 @@ app.commandLine.appendSwitch('disable-http-cache');
 // Register custom protocol as secure/standard
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true } }]);
 
+const SECURITY_HEADERS: Record<string, string> = {
+  'Content-Security-Policy':
+    "default-src 'self' app:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' app: https://api.github.com https://fonts.googleapis.com https://fonts.gstatic.com ws://localhost:4200 http://localhost:4200; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+};
+
 let updaterInitialized = false;
 let isVersionLocked = false;
 
@@ -113,6 +123,18 @@ function createWindow() {
       shell.openExternal(url);
     }
     return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (event, navigationUrl) => {
+    const parsed = new URL(navigationUrl);
+    const isAppOrigin = parsed.protocol === 'app:';
+    const isDevOrigin = !app.isPackaged && (parsed.origin === 'http://localhost:4200' || parsed.origin === 'ws://localhost:4200');
+    if (!isAppOrigin && !isDevOrigin) {
+      event.preventDefault();
+      if (navigationUrl.startsWith('https:') || navigationUrl.startsWith('http:')) {
+        shell.openExternal(navigationUrl);
+      }
+    }
   });
 
   if (!app.isPackaged && !process.env['ELECTRON_PROD_DEBUG']) {
@@ -221,10 +243,7 @@ app.whenReady().then(async () => {
       return new Response(new Uint8Array(fileContent), {
         headers: {
           'content-type': mimeTypes[extension] || 'application/octet-stream',
-          'Content-Security-Policy':
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' ws://localhost:4200 http://localhost:4200 https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net;",
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
+          ...SECURITY_HEADERS,
         },
       });
     } catch (_e) {
@@ -233,10 +252,7 @@ app.whenReady().then(async () => {
         return new Response(new Uint8Array(indexContent), {
           headers: {
             'content-type': 'text/html',
-            'Content-Security-Policy':
-              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' ws://localhost:4200 http://localhost:4200 https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net;",
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
+            ...SECURITY_HEADERS,
           },
         });
       } catch {
@@ -247,13 +263,24 @@ app.whenReady().then(async () => {
 
   await verifyIntegrity();
 
-  // Hardened Permission Request Handler
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+  // Restrict webview creation
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-attach-webview', (event) => {
+      event.preventDefault();
+    });
+  });
+
+  // Hardened Permission Request and Check Handlers
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     // Allow camera access for Air-Gap QR features, deny everything else
     if (permission === 'media') {
       return callback(true);
     }
     callback(false);
+  });
+
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return permission === 'media';
   });
 
   createWindow();
@@ -294,6 +321,10 @@ ipcMain.on('close-window', () => {
 });
 
 ipcMain.on('check-for-updates', () => {
+  if (isVersionLocked) {
+    sendStatusToWindow('locked', 'Update check blocked: Version is locked.');
+    return;
+  }
   autoUpdater.checkForUpdates();
 });
 
@@ -389,7 +420,13 @@ ipcMain.handle('vault-list-files', async () => {
   }
 });
 
-ipcMain.on('restart-and-install', () => autoUpdater.quitAndInstall());
+ipcMain.on('restart-and-install', () => {
+  if (isVersionLocked) {
+    sendStatusToWindow('locked', 'Restart and install blocked: Version is locked.');
+    return;
+  }
+  autoUpdater.quitAndInstall();
+});
 
 autoUpdater.on('update-available', () => {
   const win = BrowserWindow.getAllWindows()[0];
@@ -551,7 +588,60 @@ async function fetchEngineFromReleases(): Promise<string> {
   }
 
   const arrayBuffer = await downloadRes.arrayBuffer();
-  fsSync.writeFileSync(archivePath, Buffer.from(arrayBuffer));
+  const fileBuffer = Buffer.from(arrayBuffer);
+
+  // Cryptographic provenance verification via SHA-256 manifest
+  const computedHash = crypto.createHash('sha256').update(fileBuffer).digest('hex').toLowerCase();
+  console.log(`[Darkstar Engine] Computed archive SHA-256: ${computedHash}`);
+
+  const checksumAsset = release.assets.find((a) => {
+    const lower = a.name.toLowerCase();
+    return lower === `${targetAsset.name.toLowerCase()}.sha256` || lower.includes('checksum') || lower.includes('sha256sum') || lower === 'sha256.txt';
+  });
+
+  if (checksumAsset) {
+    console.log(`[Darkstar Engine] Verifying checksum against release manifest ${checksumAsset.name}...`);
+    let csRes = await fetch(checksumAsset.browser_download_url, { headers });
+    if (csRes.status === 401 && headers['Authorization']) {
+      delete headers['Authorization'];
+      csRes = await fetch(checksumAsset.browser_download_url, { headers });
+    }
+    if (csRes.ok) {
+      const checksumText = await csRes.text();
+      let expectedHash: string | null = null;
+
+      const lines = checksumText.split(/\r?\n/);
+      for (const line of lines) {
+        if (line.includes(targetAsset.name)) {
+          const match = line.match(/[a-fA-F0-9]{64}/);
+          if (match) {
+            expectedHash = match[0].toLowerCase();
+            break;
+          }
+        }
+      }
+
+      if (!expectedHash && checksumAsset.name.toLowerCase().includes(targetAsset.name.toLowerCase())) {
+        const match = checksumText.match(/[a-fA-F0-9]{64}/);
+        if (match) {
+          expectedHash = match[0].toLowerCase();
+        }
+      }
+
+      if (expectedHash) {
+        if (computedHash !== expectedHash) {
+          throw new Error(`Provenance verification failed: SHA-256 checksum mismatch for ${targetAsset.name}!\n` + `Expected: ${expectedHash}\n` + `Computed: ${computedHash}`);
+        }
+        console.log(`[Darkstar Engine] Cryptographic provenance verified: SHA-256 matches manifest (${computedHash}).`);
+      } else {
+        console.warn(`[Darkstar Engine] Checksum manifest did not contain explicit entry for ${targetAsset.name}.`);
+      }
+    }
+  } else {
+    console.warn(`[Darkstar Engine] Notice: No SHA-256 checksum manifest detected in release ${release.tag_name}.`);
+  }
+
+  fsSync.writeFileSync(archivePath, fileBuffer);
 
   console.log(`[Darkstar Engine] Extracting archive...`);
   try {
@@ -633,6 +723,12 @@ async function runDArxCommand(args: string[]): Promise<unknown> {
 
   // If native binary is missing, auto-fetch from Kryklin/darkstar releases!
   if (!foundBinary) {
+    if (isVersionLocked) {
+      throw new Error(
+        `D-ARX-512 Native Core executable not found and auto-fetch blocked because Version is locked.\n` +
+          `Please ensure the engine is installed in ./bin/d-arx-512${ext} or specify DARKSTAR_ENGINE_PATH in .env.`,
+      );
+    }
     try {
       console.log('[Darkstar Engine] Native D-ARX core missing. Auto-fetching from Kryklin/darkstar releases...');
       foundBinary = await fetchEngineFromReleases();
@@ -729,6 +825,9 @@ ipcMain.handle('darx-check-engine', async () => {
 });
 
 ipcMain.handle('darx-fetch-engine', async () => {
+  if (isVersionLocked) {
+    return { success: false, error: 'Engine download blocked: Version is locked.' };
+  }
   try {
     const binaryPath = await fetchEngineFromReleases();
     return { success: true, binaryPath };
