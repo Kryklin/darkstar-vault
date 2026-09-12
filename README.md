@@ -64,9 +64,9 @@ _Select the **Run Dev Environment** option to launch Angular and Electron concur
 
 When UI changes are made, they must be synchronized to the native mobile wrappers. This can be handled directly via the CLI:
 
-1.  Launch `npm start`.
-2.  Select **Sync Mobile Assets**.
-    - This will automatically build the web assets (`npm run build`) and perform the synchronization (`npx cap sync`).
+1. Launch `npm start`.
+2. Select **Sync Mobile Assets**.
+   - This will automatically build the web assets (`npm run build`) and perform the synchronization (`npx cap sync`).
 
 ### Opening Native IDEs
 

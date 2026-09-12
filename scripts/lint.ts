@@ -6,6 +6,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { execa } from 'execa';
 
+interface LintJob {
+  name: string;
+  cmd: string;
+  status?: string;
+}
+
 (async () => {
   const { default: ora } = await import('ora');
   const { default: chalk } = await import('chalk');
@@ -13,7 +19,7 @@ import { execa } from 'execa';
 
   console.log(chalk.hex('#00BFFF').bold('\n  🔍  Code Linting Initialization\n'));
 
-  const jobs = [
+  const jobs: LintJob[] = [
     { name: 'TypeScript', cmd: 'npm run lint:ts' },
   ];
 
@@ -24,11 +30,12 @@ import { execa } from 'execa';
       await execa(job.cmd, { shell: true });
       job.status = chalk.green('Passed');
       spinner.succeed(chalk.green(`${job.name} passed all lint checks.`));
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
       job.status = chalk.red('Failed');
       spinner.fail(chalk.red(`${job.name} found linting errors.`));
       // Print the output so the user can fix it
-      console.log(chalk.dim('\n' + (error.stdout || error.stderr || error.message) + '\n'));
+      console.log(chalk.dim('\n' + (err.stdout || err.stderr || err.message) + '\n'));
     }
   }
 
@@ -41,8 +48,8 @@ import { execa } from 'execa';
   let allPassed = true;
 
   jobs.forEach((j) => {
-    table.push([j.name, j.status]);
-    if (j.status.includes('Failed')) allPassed = false;
+    table.push([j.name, j.status || 'Pending']);
+    if (j.status && j.status.includes('Failed')) allPassed = false;
   });
 
   console.log('\n' + table.toString() + '\n');

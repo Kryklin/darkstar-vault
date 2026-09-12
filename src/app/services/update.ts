@@ -16,7 +16,7 @@ const GitHubReleaseSchema = z.object({
   providedIn: 'root',
 })
 export class UpdateService {
-  router = inject(Router);
+  router: Router = inject(Router);
   ngZone = inject(NgZone);
   private snackBar = inject(MatSnackBar);
 

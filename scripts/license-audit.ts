@@ -5,7 +5,13 @@ const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { execa } from 'execa';
-const path = require('path');
+
+interface LicenseJob {
+  name: string;
+  cmd: string;
+  cwd?: string;
+  status?: string;
+}
 
 (async () => {
   const { default: ora } = await import('ora');
@@ -14,10 +20,7 @@ const path = require('path');
 
   console.log(chalk.hex('#FFD700').bold('\n  ⚖️   Open Source License Compliance Audit\n'));
 
-  // Acceptable licenses whitelist
-  const allowed = ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'CC0-1.0'];
-
-  const jobs = [
+  const jobs: LicenseJob[] = [
     {
       name: 'NPM (JavaScript)',
       cmd: 'npx license-checker-rseidelsohn --summary --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;Python-2.0;Unlicense;CC-BY-4.0;CC-BY-3.0;BlueOak-1.0.0;0BSD;WTFPL;Zlib;UNLICENSED"',
@@ -28,18 +31,14 @@ const path = require('path');
     const job = jobs[i];
     const spinner = ora(chalk.blue(`Auditing ${job.name}...`)).start();
     try {
-      if (job.name.includes('Cargo')) {
-        // We need a basic deny.toml for cargo-deny to work or it uses defaults
-        // It defaults to allowing MIT/Apache, but we can just run it
-      }
-
       await execa(job.cmd, { shell: true, cwd: job.cwd || process.cwd() });
       job.status = chalk.green('Compliant');
       spinner.succeed(chalk.green(`${job.name} passed strict license audit.`));
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
       job.status = chalk.red('Violation Detected');
       spinner.fail(chalk.red(`${job.name} license violation found!`));
-      console.log(chalk.dim('\n' + (error.stdout || error.stderr || error.message) + '\n'));
+      console.log(chalk.dim('\n' + (err.stdout || err.stderr || err.message) + '\n'));
     }
   }
 
@@ -52,8 +51,8 @@ const path = require('path');
   let allPassed = true;
 
   jobs.forEach((j) => {
-    table.push([j.name, j.status]);
-    if (j.status.includes('Violation')) allPassed = false;
+    table.push([j.name, j.status || 'Pending']);
+    if (j.status && j.status.includes('Violation')) allPassed = false;
   });
 
   console.log('\n' + table.toString() + '\n');

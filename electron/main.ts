@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, autoUpdater, sess
 import * as http from 'http';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import { updateElectronApp } from 'update-electron-app';
 import { machineIdSync } from 'node-machine-id';
 
@@ -485,7 +486,6 @@ async function runDAsPCommand(engine: string, args: string[]): Promise<unknown> 
   }
 
   // Find first existing executable
-  const fsSync = require('fs');
   const foundBinary = candidateSearchPaths.find((p) => {
     try {
       return fsSync.existsSync(p);

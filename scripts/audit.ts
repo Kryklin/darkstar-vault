@@ -6,6 +6,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { execa } from 'execa';
 
+interface AuditItem {
+  name: string;
+  status: string;
+  vulns: number;
+  cmd: string;
+  parse: (out: string) => number;
+}
+
 (async () => {
   const { default: ora } = await import('ora');
   const { default: chalk } = await import('chalk');
@@ -13,7 +21,7 @@ import { execa } from 'execa';
 
   console.log(chalk.hex('#00ADD8').bold('\n  🛡️  Security Audit Initialization\n'));
 
-  const results = [
+  const results: AuditItem[] = [
     { name: 'NPM (JavaScript)', status: 'Pending', vulns: 0, cmd: 'npm audit --json', parse: parseNpm },
   ];
 
@@ -29,8 +37,9 @@ import { execa } from 'execa';
       } else {
         spinner.succeed(chalk.green(`${item.name} completed perfectly.`));
       }
-    } catch (error) {
-      const stdout = error.stdout || '';
+    } catch (error: unknown) {
+      const err = error as { stdout?: string; message?: string };
+      const stdout = err.stdout || '';
       try {
         item.vulns = item.parse(stdout);
         item.status = item.vulns > 0 ? chalk.red('Failed') : chalk.red('Error');
@@ -39,14 +48,10 @@ import { execa } from 'execa';
         } else {
           spinner.fail(chalk.red(`${item.name} failed to execute properly.`));
         }
-      } catch (e) {
-        if (item.name === 'Cargo (Rust)' && stdout.includes('no such command')) {
-          item.status = chalk.yellow('Skipped');
-          spinner.warn(chalk.yellow(`${item.name} skipped (cargo-audit not installed).`));
-        } else {
-          item.status = chalk.red('Error');
-          spinner.fail(chalk.red(`${item.name} failed to execute. ${e.message}`));
-        }
+      } catch (e: unknown) {
+        const err2 = e as Error;
+        item.status = chalk.red('Error');
+        spinner.fail(chalk.red(`${item.name} failed to execute. ${err2.message}`));
       }
     }
   }
@@ -83,35 +88,9 @@ import { execa } from 'execa';
     process.exit(0);
   }
 
-  function parseNpm(out) {
+  function parseNpm(out: string): number {
     if (!out) return 0;
     const json = JSON.parse(out.substring(out.indexOf('{')));
-    return json.metadata.vulnerabilities.total || 0;
-  }
-
-  function parseCargo(out) {
-    if (!out) return 0;
-    const json = JSON.parse(out.substring(out.indexOf('{')));
-    return json.vulnerabilities.count || 0;
-  }
-
-  function parseGo(out) {
-    if (!out) return 0;
-    const match = out.match(/Your code is affected by (\d+) vulnerabilities/i);
-    return match ? parseInt(match[1]) : 0;
-  }
-
-  function parsePython(out) {
-    if (!out) return 0;
-    const jsonStr = out.substring(out.indexOf('{'));
-    if (!jsonStr) return 0;
-    const json = JSON.parse(jsonStr);
-    let count = 0;
-    if (json.dependencies) {
-      json.dependencies.forEach((d) => {
-        if (d.vulns) count += d.vulns.length;
-      });
-    }
-    return count;
+    return json.metadata?.vulnerabilities?.total || 0;
   }
 })();
