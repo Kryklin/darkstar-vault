@@ -5,8 +5,8 @@
   transition: background 0.3s ease;
 
   &.dragging {
-    background: rgba(var(--mat-sys-primary-main), 0.05);
-    outline: 2px dashed var(--mat-sys-primary-main);
+    background: rgba(var(--mat-sys-primary-rgb), 0.05);
+    outline: 2px dashed var(--mat-sys-primary);
     outline-offset: -12px;
   }
 }
@@ -22,7 +22,7 @@
       margin: 0;
       font-size: 1.8rem;
       font-weight: 600;
-      background: linear-gradient(45deg, var(--mat-sys-primary-main), var(--mat-sys-secondary-main));
+      background: linear-gradient(45deg, var(--mat-sys-primary), var(--mat-sys-secondary));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -62,7 +62,7 @@
     width: 64px;
     height: 64px;
     margin-bottom: 16px;
-    color: var(--mat-sys-primary-main);
+    color: var(--mat-sys-primary);
     animation: bounce 2s infinite;
   }
 }
@@ -87,21 +87,21 @@
   &:hover {
     transform: translateY(-2px);
     background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(var(--mat-sys-primary-main), 0.3);
+    border-color: rgba(var(--mat-sys-primary-rgb), 0.3);
   }
 
   .file-type-icon {
     width: 48px;
     height: 48px;
     border-radius: 10px;
-    background: rgba(var(--mat-sys-primary-main), 0.1);
+    background: rgba(var(--mat-sys-primary-rgb), 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 16px;
 
     mat-icon {
-      color: var(--mat-sys-primary-main);
+      color: var(--mat-sys-primary);
     }
   }
 

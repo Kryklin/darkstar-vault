@@ -2,7 +2,9 @@
 
 .sidenav-container {
   height: 100%;
-  background: radial-gradient(circle at 0% 0%, rgba(64, 196, 255, 0.05) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(0, 145, 234, 0.05) 0%, transparent 50%);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--mat-sys-primary-rgb, 64, 196, 255), 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(var(--mat-sys-primary-rgb, 0, 145, 234), 0.05) 0%, transparent 50%);
 }
 
 mat-toolbar {
@@ -257,13 +259,13 @@ mat-nav-list {
   }
 
   &.missing {
-    background: rgba(64, 196, 255, 0.05);
-    border-color: rgba(64, 196, 255, 0.2);
-    color: #40c4ff;
+    background: rgba(var(--mat-sys-primary-rgb), 0.05);
+    border-color: rgba(var(--mat-sys-primary-rgb), 0.2);
+    color: var(--mat-sys-primary);
 
     &:hover {
-      background: rgba(64, 196, 255, 0.1);
-      box-shadow: 0 0 15px rgba(64, 196, 255, 0.1);
+      background: rgba(var(--mat-sys-primary-rgb), 0.1);
+      box-shadow: 0 0 15px rgba(var(--mat-sys-primary-rgb), 0.1);
     }
   }
 

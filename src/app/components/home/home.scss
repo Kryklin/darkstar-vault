@@ -322,15 +322,15 @@
   }
 
   &.ready {
-    color: #40c4ff; // Cyan
-    border-color: rgba(64, 196, 255, 0.6);
-    background: rgba(64, 196, 255, 0.1);
+    color: var(--mat-sys-primary);
+    border-color: rgba(var(--mat-sys-primary-rgb), 0.6);
+    background: rgba(var(--mat-sys-primary-rgb), 0.1);
     cursor: pointer;
-    box-shadow: 0 0 15px rgba(64, 196, 255, 0.2);
+    box-shadow: 0 0 15px rgba(var(--mat-sys-primary-rgb), 0.2);
     animation: flash 2s infinite ease-in-out;
 
     &:hover {
-      background: rgba(64, 196, 255, 0.2);
+      background: rgba(var(--mat-sys-primary-rgb), 0.2);
       transform: translateY(-1px);
     }
   }

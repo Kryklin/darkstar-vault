@@ -44,12 +44,12 @@ body {
 :root {
   color-scheme: dark; // Enforces dark mode on native browser elements (like standard scrollbars)
   --glass-bg: rgba(15, 15, 15, 0.45);
-  --glass-bg-accent: rgba(64, 196, 255, 0.08);
+  --glass-bg-accent: rgba(var(--mat-sys-primary-rgb, 64, 196, 255), 0.08);
   --glass-border: rgba(255, 255, 255, 0.12);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   --glass-text: #ffffff;
   --glass-text-muted: rgba(255, 255, 255, 0.55);
-  --glass-glow: rgba(64, 196, 255, 0.4);
+  --glass-glow: rgba(var(--mat-sys-primary-rgb, 64, 196, 255), 0.4);
   --glass-input-bg: rgba(255, 255, 255, 0.04);
   --mat-sys-error-rgb: 244, 67, 54;
 }
@@ -92,7 +92,7 @@ body {
       transition: all 0.3s ease !important;
 
       &:hover {
-        border-color: rgba(64, 196, 255, 0.4) !important;
+        border-color: rgba(var(--mat-sys-primary-rgb, 64, 196, 255), 0.4) !important;
         background: rgba(255, 255, 255, 0.06) !important;
       }
     }
@@ -418,7 +418,7 @@ body.light-theme .app-title {
     transform: translateY(-4px);
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.5),
-      0 0 20px rgba(64, 196, 255, 0.1);
+      0 0 20px rgba(var(--mat-sys-primary-rgb, 64, 196, 255), 0.1);
     border-color: rgba(255, 255, 255, 0.2);
   }
 }

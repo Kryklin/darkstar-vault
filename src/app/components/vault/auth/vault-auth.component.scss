@@ -89,6 +89,12 @@ button[mat-flat-button] {
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:not([disabled]):hover {
+    box-shadow: 0 0 20px rgba(var(--mat-sys-primary-rgb), 0.35);
+    transform: translateY(-1px);
+  }
 }
 .error-msg {
   color: var(--mat-sys-error);
