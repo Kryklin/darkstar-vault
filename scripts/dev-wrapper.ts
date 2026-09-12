@@ -1,14 +1,11 @@
-import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { fetchEngines } from './fetch-engines.ts';
 
-const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const __dirname = path.dirname(__filename);
 
 (async () => {
   const { default: chalk } = await import('chalk');

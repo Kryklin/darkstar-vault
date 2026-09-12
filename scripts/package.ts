@@ -1,11 +1,11 @@
+import fs from 'fs';
+import path from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const fs = require('fs');
-const path = require('path');
+const __dirname = path.dirname(__filename);
 const pkg = require('../package.json');
 
 (async () => {
