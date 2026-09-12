@@ -13,8 +13,9 @@ import packageJson from '../../../../package.json';
 export class About {
   version = packageJson.version;
   repoUrl = packageJson.repository.url.replace('.git', '');
-  licenseType = 'MIT License';
+  licenseType = 'CC BY 4.0';
   donationUrl = 'https://blockstream.info/address/bc1qsstnef7gh3rl593t4lm9276zk43rjl3mux9m5f72xp4cvr5gep5skam5hx';
+  mathSpecUrl = 'https://github.com/Kryklin/darkstar';
 
   hasAchievement = signal(localStorage.getItem('darkstar_asteroid_achievement') === 'true');
 

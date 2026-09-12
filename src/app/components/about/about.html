@@ -1,15 +1,23 @@
 <div class="about-container page-layout-wrapper">
+  <!-- HERO HEADER -->
   <div class="about-hero">
-    <h1 class="premium-glitch-auto" data-text="DARKSTAR">DARKSTAR</h1>
-    <p class="subtitle">Sovereign Post-Quantum Protection Suite</p>
-    <div class="version-badge">v{{ version }} // STABLE</div>
+    <div class="hero-brand">
+      <h1 class="premium-glitch-auto" data-text="DARKSTAR">DARKSTAR</h1>
+      <p class="subtitle">Sovereign Post-Quantum Protection Suite</p>
+    </div>
+    <div class="hero-badges">
+      <div class="version-badge">v{{ version }} // STABLE</div>
+      <div class="engine-badge">D-ARX-512 CORE</div>
+      <div class="pqc-badge">NIST PQC READY</div>
+    </div>
   </div>
 
+  <!-- DEEP DIVE SECTION -->
   <section class="deep-dive-section">
-    <h2 class="section-title">The D-ARX Protocol</h2>
+    <h2 class="section-title">The Sovereign D-ARX-512 Protocol</h2>
     <p class="section-intro">
-      D-ARX (Darkstar Autoregressive Permutation & Exchange) is a sovereign encryption engine designed to provide bit-perfect interoperability across host environments while neutralizing both
-      classical analysis and quantum-state exploration.
+      D-ARX (Darkstar Autoregressive Permutation & Exchange) is a sovereign post-quantum cryptographic engine engineered to provide bit-perfect interoperability across host environments while
+      neutralizing classical cryptanalysis and quantum-state exploration.
     </p>
 
     <div class="phase-pipeline">
@@ -18,33 +26,32 @@
         <div class="phase-number">01</div>
         <div class="phase-icon"><span class="material-icons">hub</span></div>
         <h3>Quantum Root</h3>
-        <p class="phase-tech">ML-KEM-1024 (Kyber)</p>
+        <p class="phase-tech">ML-KEM-1024 (Kyber / FIPS 203)</p>
         <p class="phase-desc">
-          Architecture begins with a NIST Level 5 Key Encapsulation. This establishes a 32-byte shared secret entangled against the recipient's identity, providing absolute immunity to Shor's quantum
-          search.
+          Architecture begins with a NIST Level 5 Key Encapsulation Mechanism. This establishes a 32-byte shared secret entangled against the recipient's identity, providing theoretical immunity to
+          Shor's quantum algorithm.
         </p>
       </div>
 
       <!-- PHASE 2 -->
       <div class="phase-card glass-card">
         <div class="phase-number">02</div>
-        <div class="phase-icon"><span class="material-icons">Cyclone</span></div>
-        <h3>ASP Cascade 16</h3>
-        <p class="phase-tech">16-Round Balanced transformation</p>
+        <div class="phase-icon"><span class="material-icons">cyclone</span></div>
+        <h3>512-Bit ARX Core</h3>
+        <p class="phase-tech">Add-Rotate-XOR CTR Stream</p>
         <p class="phase-desc">
-          Every word undergoes 16 rounds of ASP Cascade logic (Substitution, Permutation, Network, Algebraic). Balanced schedules ensure S-Box confusion and MatrixHill diffusion are enforced at fixed
-          intervals to destroy statistical patterns.
+          Operates as a 512-bit ARX permutation executing in Counter (CTR) mode. Pure ALU operations enforce strict non-linear diffusion and confusion without secret-indexed memory lookups.
         </p>
       </div>
 
       <!-- PHASE 3 -->
       <div class="phase-card glass-card">
         <div class="phase-number">03</div>
-        <div class="phase-icon"><span class="material-icons">link</span></div>
-        <h3>Cipher Fusion</h3>
-        <p class="phase-tech">Inter-Word Chaining</p>
+        <div class="phase-icon"><span class="material-icons">vpn_key</span></div>
+        <h3>Key Expansion</h3>
+        <p class="phase-tech">2048-Byte Key Schedule</p>
         <p class="phase-desc">
-          Words are not isolated. The output of each transformation is fused into the state of the next using a SHA-256 XOR-chain, creating a global avalanche effect across the entire recovery phrase.
+          Master entropy is expanded through a 2048-byte key schedule cascade. Subkeys are diversified across permutation rounds, preventing statistical reconstruction and slide attacks.
         </p>
       </div>
 
@@ -52,94 +59,147 @@
       <div class="phase-card glass-card">
         <div class="phase-number">04</div>
         <div class="phase-icon"><span class="material-icons">terminal</span></div>
-        <h3>Kernel Parity</h3>
-        <p class="phase-tech">Multi-Language Interop</p>
+        <h3>Universal Parity</h3>
+        <p class="phase-tech">Bit-Perfect Multi-Platform</p>
         <p class="phase-desc">
-          Strict deterministic pathing ensures that Rust, Go, Python, and Node.js implementations produce bit-perfect identical ciphertexts, allowing seamless cross-platform vault recovery.
+          Strict deterministic pathing ensures native Rust, C (AVX2), CUDA, and WebAssembly implementations generate identical keystreams for seamless air-gapped vault recovery.
         </p>
       </div>
     </div>
   </section>
 
+  <!-- LIVE KERNEL TRACE -->
   <section class="trace-section glass-card">
     <div class="trace-header">
       <div class="live-indicator"><span class="dot"></span> LIVE KERNEL TRACE</div>
-      <h3>Data Transformation Flow</h3>
+      <h3>Data Transformation Pipeline</h3>
     </div>
 
     <div class="flow-diagram-container">
       <svg class="flow-svg" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
         <!-- Connections -->
-        <path class="trace-path p1" d="M100 100 H200" />
-        <path class="trace-path p2" d="M300 100 H350" />
-        <path class="trace-path p3" d="M550 100 H600" />
-        <path class="trace-path pulse-path" d="M100 100 H200 M300 100 H350 M350 100 L375 80 L425 80 L450 100 L475 120 L525 120 L550 100 M550 100 H600" />
+        <path class="trace-path p1" d="M90 100 H180" />
+        <path class="trace-path p2" d="M280 100 H340" />
+        <path class="trace-path p3" d="M560 100 H630" />
+        <path class="trace-path pulse-path" d="M90 100 H180 M280 100 H340 M340 100 L370 75 L430 75 L460 100 L480 125 L530 125 L560 100 M560 100 H630" />
 
         <!-- Nodes -->
         <g class="node n1">
-          <circle cx="100" cy="100" r="30" />
-          <text x="100" y="105" text-anchor="middle" class="node-label">INPUT</text>
-        </g>
-        <g class="node n2">
-          <rect x="200" y="70" width="100" height="60" rx="8" />
-          <text x="250" y="105" text-anchor="middle" class="node-label">ML-KEM</text>
+          <circle cx="90" cy="100" r="30" />
+          <text x="90" y="104" text-anchor="middle" class="node-label">INPUT</text>
         </g>
 
-        <!-- CASCADE SUB-SYSTEM -->
+        <g class="node n2">
+          <rect x="180" y="70" width="100" height="60" rx="8" />
+          <text x="230" y="104" text-anchor="middle" class="node-label">ML-KEM</text>
+        </g>
+
+        <!-- D-ARX SYSTEM -->
         <g class="cascade-system">
-          <rect x="350" y="50" width="200" height="100" rx="12" class="cascade-frame" />
-          <text x="450" y="65" text-anchor="middle" class="node-label-main">ASP CASCADE 16</text>
+          <rect x="340" y="45" width="220" height="110" rx="12" class="cascade-frame" />
+          <text x="450" y="63" text-anchor="middle" class="node-label-main">D-ARX-512 CORE</text>
 
           <g class="sub-node s1">
-            <circle cx="400" cy="80" r="15" />
-            <text x="400" y="84" text-anchor="middle" class="sub-label">S</text>
+            <circle cx="390" cy="85" r="16" />
+            <text x="390" y="89" text-anchor="middle" class="sub-label">ADD</text>
           </g>
           <g class="sub-node p1">
-            <circle cx="450" cy="80" r="15" />
-            <text x="450" y="84" text-anchor="middle" class="sub-label">P</text>
+            <circle cx="445" cy="85" r="16" />
+            <text x="445" y="89" text-anchor="middle" class="sub-label">ROT</text>
           </g>
           <g class="sub-node n1">
-            <circle cx="500" cy="120" r="15" />
-            <text x="500" y="124" text-anchor="middle" class="sub-label">N</text>
+            <circle cx="500" cy="85" r="16" />
+            <text x="500" y="89" text-anchor="middle" class="sub-label">XOR</text>
           </g>
           <g class="sub-node a1">
-            <circle cx="450" cy="120" r="15" />
-            <text x="450" y="124" text-anchor="middle" class="sub-label">A</text>
+            <circle cx="445" cy="122" r="16" />
+            <text x="445" y="126" text-anchor="middle" class="sub-label">CTR</text>
           </g>
 
-          <text x="450" y="145" text-anchor="middle" class="complexity-label">[ 16 ROUNDS / 64 LAYERS ]</text>
-          <path class="sub-trace" d="M375 80 H425 M450 100 L475 120 H525" />
+          <text x="450" y="148" text-anchor="middle" class="complexity-label">[ 512-BIT CTR STREAM // 2048-BYTE EXPANSION ]</text>
+          <path class="sub-trace" d="M370 85 H425 M445 101 V106 M465 85 H480" />
         </g>
 
         <g class="node n4">
-          <circle cx="650" cy="100" r="40" />
-          <text x="650" y="105" text-anchor="middle" class="node-label">OUTPUT</text>
+          <circle cx="670" cy="100" r="38" />
+          <text x="670" y="104" text-anchor="middle" class="node-label">OUTPUT</text>
         </g>
       </svg>
 
       <div class="example-data">
         <div class="data-box in">
-          <span class="label">Source</span>
-          <span class="val">"apple"</span>
+          <span class="label">Plaintext Input</span>
+          <span class="val">"sovereign-vault"</span>
         </div>
         <div class="data-box out">
-          <span class="label">Result</span>
-          <span class="val">0x8F2A...9C</span>
+          <span class="label">Keystream XOR Output</span>
+          <span class="val">0x9F3E...B24D</span>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="tech-stack glass-card">
-    <h3>Engine Kernels</h3>
-    <div class="kernel-grid">
-      <div class="kernel-item"><i class="devicon-rust-plain"></i><span>Rust (Stable)</span></div>
-      <div class="kernel-item"><i class="devicon-go-plain"></i><span>Go (Optimized)</span></div>
-      <div class="kernel-item"><i class="devicon-nodejs-plain"></i><span>Node.js (Core)</span></div>
-      <div class="kernel-item"><i class="devicon-python-plain"></i><span>Python (Bridge)</span></div>
+  <!-- SIDE-CHANNEL DEFENSE GRID -->
+  <section class="defense-section glass-card">
+    <div class="defense-header">
+      <div class="defense-badge"><span class="material-icons">shield</span> HARDENED SPECS</div>
+      <h3>Implementation & Side-Channel Mitigations</h3>
+    </div>
+    <div class="defense-grid">
+      <div class="defense-card">
+        <div class="defense-icon"><span class="material-icons">memory</span></div>
+        <h4>Zenbleed Mitigation</h4>
+        <p>Enforces complete physical SIMD register scrub via <code>_mm256_zeroupper()</code> preventing transient data leakage.</p>
+      </div>
+      <div class="defense-card">
+        <div class="defense-icon"><span class="material-icons">lock</span></div>
+        <h4>Zero S-Box Timing</h4>
+        <p>Pure ARX operations avoid secret-indexed cache lookups, eliminating microarchitectural cache timing side-channels.</p>
+      </div>
+      <div class="defense-card">
+        <div class="defense-icon"><span class="material-icons">speed</span></div>
+        <h4>Speculation Barriers</h4>
+        <p>Strict instruction fences via <code>lfence</code> (x86_64) and <code>isb/csdb</code> (ARM) neutralize Spectre v1 / Meltdown transients.</p>
+      </div>
+      <div class="defense-card">
+        <div class="defense-icon"><span class="material-icons">fingerprint</span></div>
+        <h4>Hardware Enclave Storage</h4>
+        <p>Master session keys are stored in OS hardware vaults via Electron <code>safeStorage</code> (TPM, Keychain, Libsecret).</p>
+      </div>
     </div>
   </section>
 
+  <!-- KERNEL IMPLEMENTATIONS -->
+  <section class="tech-stack glass-card">
+    <div class="tech-stack-header">
+      <div class="tech-badge"><span class="material-icons">settings_suggest</span> NATIVE RUNTIMES</div>
+      <h3>Multi-Language Kernel Engines</h3>
+    </div>
+    <div class="kernel-grid">
+      <div class="kernel-item">
+        <div class="kernel-icon-box"><span class="material-icons">precision_manufacturing</span></div>
+        <span class="kernel-name">Rust Core</span>
+        <span class="kernel-spec">Reference (43.7 MB/s)</span>
+      </div>
+      <div class="kernel-item">
+        <div class="kernel-icon-box"><span class="material-icons">bolt</span></div>
+        <span class="kernel-name">C Native</span>
+        <span class="kernel-spec">AVX2 Vectorized SIMD</span>
+      </div>
+      <div class="kernel-item">
+        <div class="kernel-icon-box"><span class="material-icons">developer_board</span></div>
+        <span class="kernel-name">CUDA Kernel</span>
+        <span class="kernel-spec">GPU Stream (645+ GB/s)</span>
+      </div>
+      <div class="kernel-item">
+        <div class="kernel-icon-box"><span class="material-icons">language</span></div>
+        <span class="kernel-name">WebAssembly</span>
+        <span class="kernel-spec">Portable Web/Node Stream</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACHIEVEMENTS -->
   @if (hasAchievement()) {
     <section class="achievements-section animate-slide-up">
       <div class="achievement-badge mega-badge">
@@ -160,21 +220,23 @@
     </section>
   }
 
+  <!-- META & ACTIONS -->
   <section class="meta-section">
     <div class="meta-links">
       <button mat-stroked-button (click)="openLink(repoUrl)"><span class="material-icons">code</span> SOURCE REPOSITORY</button>
-      <button mat-stroked-button (click)="openLink(donationUrl)"><span class="material-icons">favorite</span> SUPPORT DEVELOPMENT</button>
+      <button mat-stroked-button (click)="openLink(mathSpecUrl)"><span class="material-icons">menu_book</span> D-ARX SPEC</button>
+      <button mat-stroked-button (click)="openLink(donationUrl)"><span class="material-icons">favorite</span> SUPPORT PROJECT</button>
     </div>
 
     <div class="meta-info">
       <p>
-        Licensed under <strong>{{ licenseType }}</strong>
+        Licensed under <strong>{{ licenseType }}</strong> (Creative Commons Attribution 4.0)
       </p>
-      <p class="disclaimer">DARKSTAR IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. USERS ASSUME ALL RISK FOR RECOVERY PHRASE MANAGEMENT.</p>
+      <p class="disclaimer">DARKSTAR VAULT IS DEFENSE-GRADE OPEN SOFTWARE. ZERO TELEMETRY IS COLLECTED. MASTER RECOVERY WORDS REMAIN CLIENT-OWNED AT ALL TIMES.</p>
     </div>
   </section>
 
   <footer class="about-footer">
-    <p>© 2026 VICTOR KANE // DARKSTAR PROJECT</p>
+    <p>© 2026 VICTOR KANE // DARKSTAR PROJECT // SOVEREIGN ENCLAVE</p>
   </footer>
 </div>
