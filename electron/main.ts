@@ -25,7 +25,7 @@ if (squirrelStartup) {
 
 // Set application identity and Windows Application User Model ID (AUMID)
 app.setName('Darkstar Vault');
-app.setAppUserModelId('com.squirrel.darkstar-vault.Darkstar');
+app.setAppUserModelId('com.squirrel.darkstar-vault.Darkstar Vault');
 
 /**
  * Automatic one-time migration from legacy storage directory (%APPDATA%/Darkstar -> %APPDATA%/Darkstar Vault).
@@ -200,7 +200,7 @@ function createShortcut(target: 'desktop' | 'start-menu'): Promise<{ success: bo
       target: targetPath,
       cwd: path.dirname(targetPath),
       description: 'Darkstar Vault - Sovereign Post-Quantum Enclave',
-      appUserModelId: 'com.squirrel.darkstar-vault.Darkstar',
+      appUserModelId: 'com.squirrel.darkstar-vault.Darkstar Vault',
     });
 
     if (operation) {

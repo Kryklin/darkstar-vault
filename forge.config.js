@@ -41,7 +41,7 @@ module.exports = {
     win32metadata: {
       CompanyName: 'Darkstar Security',
       FileDescription: 'Darkstar Vault - Sovereign Post-Quantum Enclave',
-      OriginalFilename: 'Darkstar.exe',
+      OriginalFilename: 'Darkstar Vault.exe',
       ProductName: 'Darkstar Vault',
       InternalName: 'darkstar-vault',
       LegalCopyright: 'Copyright © 2026 Darkstar. All rights reserved.',
@@ -64,8 +64,8 @@ module.exports = {
         iconUrl: 'https://raw.githubusercontent.com/Kryklin/darkstar-vault/main/public/favicon.ico',
         createDesktopShortcut: true,
         createStartMenuShortcut: true,
-        setupExe: 'Darkstar Setup.exe',
-        exe: 'Darkstar.exe',
+        setupExe: 'Darkstar Vault Setup.exe',
+        exe: 'Darkstar Vault.exe',
       },
     },
     {
