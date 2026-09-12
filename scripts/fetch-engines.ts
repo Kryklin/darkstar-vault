@@ -32,11 +32,11 @@ export async function fetchEngines(force = false): Promise<boolean> {
   const isWindows = process.platform === 'win32';
   const ext = isWindows ? '.exe' : '';
   const rustBin = path.join(binDir, `d-arx-512${ext}`);
-  const aspAlias = path.join(binDir, `d-asp${ext}`);
+  const arxAlias = path.join(binDir, `d-arx${ext}`);
 
   // If binaries already exist and force flag is not passed, verify and exit early
-  if (!force && (fs.existsSync(rustBin) || fs.existsSync(aspAlias))) {
-    const activeBin = fs.existsSync(rustBin) ? rustBin : aspAlias;
+  if (!force && (fs.existsSync(rustBin) || fs.existsSync(arxAlias))) {
+    const activeBin = fs.existsSync(rustBin) ? rustBin : arxAlias;
     const spinner = ora(chalk.blue(`Verifying existing crypto engine at ${activeBin}...`)).start();
     try {
       execSync(`"${activeBin}" test`, { stdio: 'pipe' });
@@ -124,15 +124,15 @@ export async function fetchEngines(force = false): Promise<boolean> {
       }
     }
 
-    // Ensure alias parity: copy/alias so both d-arx-512.exe and d-asp.exe exist
-    if (fs.existsSync(rustBin) && !fs.existsSync(aspAlias)) {
-      fs.copyFileSync(rustBin, aspAlias);
-    } else if (fs.existsSync(aspAlias) && !fs.existsSync(rustBin)) {
-      fs.copyFileSync(aspAlias, rustBin);
+    // Ensure alias parity: copy/alias so both d-arx-512.exe and d-arx.exe exist
+    if (fs.existsSync(rustBin) && !fs.existsSync(arxAlias)) {
+      fs.copyFileSync(rustBin, arxAlias);
+    } else if (fs.existsSync(arxAlias) && !fs.existsSync(rustBin)) {
+      fs.copyFileSync(arxAlias, rustBin);
     }
 
     // Self-test verification
-    const activeBin = fs.existsSync(rustBin) ? rustBin : aspAlias;
+    const activeBin = fs.existsSync(rustBin) ? rustBin : arxAlias;
     const testSpinner = ora(chalk.blue('Running cryptographic engine self-test...')).start();
     try {
       execSync(`"${activeBin}" test`, { stdio: 'pipe' });

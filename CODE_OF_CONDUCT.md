@@ -66,4 +66,4 @@ version 2.1, available at
 
 ---
 
-[**&larr; Back to Project Root**](README.md) | [**D-ASP Mathematical Specification**](https://github.com/Kryklin/darkstar/blob/main/d-asp/DASP_CRYPTO_MATH.md)
+[**&larr; Back to Project Root**](README.md) | [**D-ARX Mathematical Specification**](https://github.com/Kryklin/darkstar/blob/main/d-arx/DASP_CRYPTO_MATH.md)

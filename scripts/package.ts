@@ -168,8 +168,8 @@ const pkg = require('../package.json');
       const ext = process.platform === 'win32' ? '.exe' : '';
       const binDir = path.resolve(__dirname, '..', 'bin');
       const rustBin = path.join(binDir, `d-arx-512${ext}`);
-      const aspAlias = path.join(binDir, `d-asp${ext}`);
-      const hasEngine = fs.existsSync(rustBin) || fs.existsSync(aspAlias);
+      const arxAlias = path.join(binDir, `d-arx${ext}`);
+      const hasEngine = fs.existsSync(rustBin) || fs.existsSync(arxAlias);
 
       if (!hasEngine) {
         if (interactive) {
@@ -235,9 +235,9 @@ const pkg = require('../package.json');
     const ext = process.platform === 'win32' ? '.exe' : '';
     const binDir = path.resolve(__dirname, '..', 'bin');
     const rustBin = path.join(binDir, `d-arx-512${ext}`);
-    const aspAlias = path.join(binDir, `d-asp${ext}`);
+    const arxAlias = path.join(binDir, `d-arx${ext}`);
 
-    if (!fs.existsSync(rustBin) && !fs.existsSync(aspAlias)) {
+    if (!fs.existsSync(rustBin) && !fs.existsSync(arxAlias)) {
       console.log(chalk.cyan('\n🔐 Native crypto engine missing in ./bin. Fetching from Kryklin/darkstar releases...'));
       await execa('npx', ['tsx', 'scripts/fetch-engines.ts'], { stdio: 'inherit', preferLocal: true });
     }

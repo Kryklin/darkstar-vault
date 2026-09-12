@@ -11,17 +11,17 @@ Darkstar is a defense-grade security suite. We prioritize the security and integ
 
 ## Post-Quantum Security Model
 
-The Darkstar ecosystem leverages the **D-ASP** (ASP Cascade 16) protocol with **ML-KEM-1024** (Kyber) at its core. Our security model assumes:
+The Darkstar ecosystem leverages the **D-ARX** (ASP Cascade 16) protocol with **ML-KEM-1024** (Kyber) at its core. Our security model assumes:
 
 - **Zero-Knowledge**: No sensitive data (passwords, recovery phrases) is ever stored in plaintext or transmitted outside the local security enclave.
 - **Physical Binding**: Payloads are cryptographically bound to the host hardware, limiting the impact of physical data theft.
-- **Algorithm Agnosticism**: D-ASP provides a structural permutation layer that remains secure even if underlying symmetric primitives are weakened.
+- **Algorithm Agnosticism**: D-ARX provides a structural permutation layer that remains secure even if underlying symmetric primitives are weakened.
 
 ## Supported Versions
 
 | Version   | Supported      | Security Standard                    |
 | :-------- | :------------- | :----------------------------------- |
-| **3.0.x** | ✅ Active      | D-ASP (ASP Cascade 16) / ML-KEM-1024 |
+| **3.0.x** | ✅ Active      | D-ARX (ASP Cascade 16) / ML-KEM-1024 |
 | **2.1.x** | ✅ Maintenance | D-KASP V5 / Kyber-1024               |
 | **< 2.1** | ❌ End of Life | Legacy RSA/AES                       |
 
@@ -50,4 +50,4 @@ Darkstar does not contain backdoors, and we do not collect telemetry or usage da
 
 ---
 
-[**&larr; Back to Project Root**](README.md) | [**D-ASP Mathematical Specification**](https://github.com/Kryklin/darkstar/blob/main/d-asp/DASP_CRYPTO_MATH.md)
+[**&larr; Back to Project Root**](README.md) | [**D-ARX Mathematical Specification**](https://github.com/Kryklin/darkstar/blob/main/d-arx/DASP_CRYPTO_MATH.md)

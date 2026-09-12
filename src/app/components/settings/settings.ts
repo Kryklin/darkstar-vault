@@ -73,9 +73,9 @@ export class Settings implements OnInit {
   }
 
   async checkEngineStatus() {
-    if (this.isElectron && window.electronAPI.dAsPCheckEngine) {
+    if (this.isElectron && window.electronAPI.dArxCheckEngine) {
       try {
-        const res = await window.electronAPI.dAsPCheckEngine();
+        const res = await window.electronAPI.dArxCheckEngine();
         this.ngZone.run(() => {
           this.engineOperational = res.operational;
           this.enginePath = res.binaryPath || '';
@@ -89,10 +89,10 @@ export class Settings implements OnInit {
   }
 
   async updateOrFetchEngine() {
-    if (!this.isElectron || !window.electronAPI.dAsPFetchEngine) return;
+    if (!this.isElectron || !window.electronAPI.dArxFetchEngine) return;
     this.isCheckingEngine = true;
     try {
-      const res = await window.electronAPI.dAsPFetchEngine();
+      const res = await window.electronAPI.dArxFetchEngine();
       if (res.success) {
         this.openDialog('D-ARX Core Verified', `Operational D-ARX core binary ready at:\n${res.binaryPath}`, [{ label: 'OK', value: true }]);
         await this.checkEngineStatus();

@@ -473,23 +473,23 @@ function getEngineCandidatePaths(): string[] {
 
   // 2. User Data directory (downloaded or installed at runtime)
   const userDataBinDir = path.join(app.getPath('userData'), 'bin');
-  candidateSearchPaths.push(path.join(userDataBinDir, `d-arx-512${ext}`), path.join(userDataBinDir, `d-asp${ext}`));
+  candidateSearchPaths.push(path.join(userDataBinDir, `d-arx-512${ext}`), path.join(userDataBinDir, `d-arx${ext}`));
 
   // 3. Packaged resources path
   if (app.isPackaged) {
     candidateSearchPaths.push(
       path.join(process.resourcesPath, `d-arx-512${ext}`),
-      path.join(process.resourcesPath, `d-asp${ext}`),
+      path.join(process.resourcesPath, `d-arx${ext}`),
       path.join(process.resourcesPath, `main${ext}`),
-      path.join(process.resourcesPath, `dasp${ext}`),
+      path.join(process.resourcesPath, `darx${ext}`),
       path.join(process.resourcesPath, 'bin', `d-arx-512${ext}`),
-      path.join(process.resourcesPath, 'bin', `d-asp${ext}`),
+      path.join(process.resourcesPath, 'bin', `d-arx${ext}`),
     );
   }
 
   // 4. Local workspace ./bin directory
   const rootBinDir = path.resolve(__dirname, '..', '..', 'bin');
-  candidateSearchPaths.push(path.join(rootBinDir, `d-arx-512${ext}`), path.join(rootBinDir, `d-asp${ext}`), path.join(rootBinDir, `main${ext}`), path.join(rootBinDir, `dasp${ext}`));
+  candidateSearchPaths.push(path.join(rootBinDir, `d-arx-512${ext}`), path.join(rootBinDir, `d-arx${ext}`), path.join(rootBinDir, `main${ext}`), path.join(rootBinDir, `darx${ext}`));
 
   return candidateSearchPaths;
 }
@@ -577,26 +577,26 @@ async function fetchEngineFromReleases(): Promise<string> {
   }
 
   const rustBin = path.join(targetBinDir, `d-arx-512${ext}`);
-  const aspAlias = path.join(targetBinDir, `d-asp${ext}`);
+  const arxAlias = path.join(targetBinDir, `d-arx${ext}`);
 
   // Maintain alias parity so either binary name works
-  if (fsSync.existsSync(rustBin) && !fsSync.existsSync(aspAlias)) {
+  if (fsSync.existsSync(rustBin) && !fsSync.existsSync(arxAlias)) {
     try {
-      fsSync.copyFileSync(rustBin, aspAlias);
+      fsSync.copyFileSync(rustBin, arxAlias);
     } catch {
       /* ignore */
     }
-  } else if (fsSync.existsSync(aspAlias) && !fsSync.existsSync(rustBin)) {
+  } else if (fsSync.existsSync(arxAlias) && !fsSync.existsSync(rustBin)) {
     try {
-      fsSync.copyFileSync(aspAlias, rustBin);
+      fsSync.copyFileSync(arxAlias, rustBin);
     } catch {
       /* ignore */
     }
   }
 
-  const activeBin = fsSync.existsSync(rustBin) ? rustBin : aspAlias;
+  const activeBin = fsSync.existsSync(rustBin) ? rustBin : arxAlias;
   if (!fsSync.existsSync(activeBin)) {
-    throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-asp${ext} was found in ${targetBinDir}`);
+    throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-arx${ext} was found in ${targetBinDir}`);
   }
 
   // Self-test verification
@@ -617,7 +617,7 @@ function sanitizeHwid(raw?: string): string | undefined {
   return crypto.createHash('sha256').update(trimmed).digest('hex');
 }
 
-async function runDAsPCommand(args: string[]): Promise<unknown> {
+async function runDArxCommand(args: string[]): Promise<unknown> {
   const isWindows = process.platform === 'win32';
   const ext = isWindows ? '.exe' : '';
 
@@ -662,7 +662,7 @@ async function runDAsPCommand(args: string[]): Promise<unknown> {
   }
 }
 
-ipcMain.handle('dasp-encrypt', async (_event, payload: string, pkHex: string, _engine?: string, hwid?: string) => {
+ipcMain.handle('darx-encrypt', async (_event, payload: string, pkHex: string, _engine?: string, hwid?: string) => {
   const cleanHwid = sanitizeHwid(hwid);
   const args: string[] = ['--diagnostic'];
   if (cleanHwid) {
@@ -671,7 +671,7 @@ ipcMain.handle('dasp-encrypt', async (_event, payload: string, pkHex: string, _e
   args.push('encrypt', payload, pkHex);
 
   try {
-    return await runDAsPCommand(args);
+    return await runDArxCommand(args);
   } catch (error: unknown) {
     const err = error as { stderr?: string; message?: string };
     const msg = err.stderr || err.message || String(error);
@@ -680,7 +680,7 @@ ipcMain.handle('dasp-encrypt', async (_event, payload: string, pkHex: string, _e
   }
 });
 
-ipcMain.handle('dasp-decrypt', async (_event, data: string, _rk: string, skHex: string, _engine?: string, hwid?: string) => {
+ipcMain.handle('darx-decrypt', async (_event, data: string, _rk: string, skHex: string, _engine?: string, hwid?: string) => {
   const cleanHwid = sanitizeHwid(hwid);
   const args: string[] = ['--diagnostic'];
   if (cleanHwid) {
@@ -689,7 +689,7 @@ ipcMain.handle('dasp-decrypt', async (_event, data: string, _rk: string, skHex: 
   args.push('decrypt', data, skHex);
 
   try {
-    return await runDAsPCommand(args);
+    return await runDArxCommand(args);
   } catch (error: unknown) {
     const err = error as { stderr?: string; message?: string };
     const msg = err.stderr || err.message || String(error);
@@ -698,7 +698,7 @@ ipcMain.handle('dasp-decrypt', async (_event, data: string, _rk: string, skHex: 
   }
 });
 
-ipcMain.handle('dasp-check-engine', async () => {
+ipcMain.handle('darx-check-engine', async () => {
   const candidatePaths = getEngineCandidatePaths();
   const existingPath = candidatePaths.find((p) => {
     try {
@@ -728,7 +728,7 @@ ipcMain.handle('dasp-check-engine', async () => {
   }
 });
 
-ipcMain.handle('dasp-fetch-engine', async () => {
+ipcMain.handle('darx-fetch-engine', async () => {
   try {
     const binaryPath = await fetchEngineFromReleases();
     return { success: true, binaryPath };

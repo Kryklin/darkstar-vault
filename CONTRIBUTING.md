@@ -63,8 +63,8 @@ We welcome suggestions for new features and improvements to existing functionali
     npx prettier --write .
     ```
 
-4.  **Native Crypto Engine (D-ASP)**:
-    - The Vault UI utilizes the native D-ASP engine from [kryklin/darkstar](https://github.com/Kryklin/darkstar).
+4.  **Native Crypto Engine (D-ARX)**:
+    - The Vault UI utilizes the native D-ARX engine from [kryklin/darkstar](https://github.com/Kryklin/darkstar).
     - To test against the native engine locally, run `npx tsx scripts/fetch-engines.ts` or place compiled binaries into `./bin/`.
 
 ## Styleguides
@@ -84,4 +84,4 @@ We welcome suggestions for new features and improvements to existing functionali
 
 ---
 
-[**&larr; Back to Project Root**](README.md) | [**D-ASP Mathematical Specification**](https://github.com/Kryklin/darkstar/blob/main/d-asp/DASP_CRYPTO_MATH.md)
+[**&larr; Back to Project Root**](README.md) | [**D-ARX Mathematical Specification**](https://github.com/Kryklin/darkstar/blob/main/d-arx/DASP_CRYPTO_MATH.md)

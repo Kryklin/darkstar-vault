@@ -14,9 +14,9 @@ const __dirname = path.dirname(__filename);
   const ext = process.platform === 'win32' ? '.exe' : '';
   const binDir = path.resolve(__dirname, '..', 'bin');
   const rustBin = path.join(binDir, `d-arx-512${ext}`);
-  const aspAlias = path.join(binDir, `d-asp${ext}`);
+  const arxAlias = path.join(binDir, `d-arx${ext}`);
 
-  if (!fs.existsSync(rustBin) && !fs.existsSync(aspAlias)) {
+  if (!fs.existsSync(rustBin) && !fs.existsSync(arxAlias)) {
     console.log(chalk.cyan('Crypto engine binary missing in ./bin. Fetching from Kryklin/darkstar releases...'));
     await fetchEngines();
   }

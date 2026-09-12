@@ -18,8 +18,8 @@ export class VaultFileService {
     const buffer = await file.arrayBuffer();
     const data = new Uint8Array(buffer);
 
-    // Encrypt using D-ASP hardened methodology
-    const encryptedData = await this.crypt.encryptBinaryDAsP(data, password, pqcPublicKey);
+    // Encrypt using D-ARX hardened methodology
+    const encryptedData = await this.crypt.encryptBinaryDArx(data, password, pqcPublicKey);
 
     // Generate unique filename
     const ref = `${crypto.randomUUID()}.enc`;

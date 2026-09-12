@@ -25,6 +25,7 @@
     "checksums": "npx tsx scripts/checksums.ts",
     "audit": "npx tsx scripts/audit.ts",
     "fetch:engines": "npx tsx scripts/fetch-engines.ts",
+    "rename:arx": "npx tsx scripts/replace-legacy-crypto-names.ts",
     "package": "electron-forge package",
     "publish": "electron-forge publish"
   },

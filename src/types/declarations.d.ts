@@ -21,10 +21,10 @@ interface ElectronAPI {
   safeStorageEncrypt(text: string): Promise<string>;
   safeStorageDecrypt(base64: string): Promise<string>;
   safeStorageAvailable(): Promise<boolean>;
-  dAsPEncrypt(payload: string, keyHex: string, engine: string, hwid?: string): Promise<unknown>;
-  dAsPDecrypt(data: string, rk: string, keyOrPass: string, engine: string, hwid?: string): Promise<unknown>;
-  dAsPCheckEngine(): Promise<{ operational: boolean; binaryPath?: string; name?: string; error?: string }>;
-  dAsPFetchEngine(): Promise<{ success: boolean; binaryPath?: string; error?: string }>;
+  dArxEncrypt(payload: string, keyHex: string, engine: string, hwid?: string): Promise<unknown>;
+  dArxDecrypt(data: string, rk: string, keyOrPass: string, engine: string, hwid?: string): Promise<unknown>;
+  dArxCheckEngine(): Promise<{ operational: boolean; binaryPath?: string; name?: string; error?: string }>;
+  dArxFetchEngine(): Promise<{ success: boolean; binaryPath?: string; error?: string }>;
 
   vaultEnsureDir(): Promise<boolean>;
   vaultSaveFile(filename: string, buffer: Uint8Array): Promise<boolean>;

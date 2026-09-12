@@ -17,7 +17,7 @@ export class CryptService {
    * Leverages ML-KEM-1024 post-quantum key encapsulation and ARX-512 symmetric permutation.
    */
   async encrypt(payload: string, keyMaterial: string, hwid?: string): Promise<{ encryptedData: string; reverseKey: string }> {
-    const result = await window.electronAPI.dAsPEncrypt(payload, keyMaterial, 'rust', hwid);
+    const result = await window.electronAPI.dArxEncrypt(payload, keyMaterial, 'rust', hwid);
     return {
       encryptedData: typeof result === 'string' ? result : JSON.stringify(result),
       reverseKey: '',
@@ -28,7 +28,7 @@ export class CryptService {
    * Decrypts an encrypted payload using the D-ARX core via Electron IPC.
    */
   async decrypt(encryptedDataRaw: string, reverseKey: string, passwordOrSk: string, hwid?: string): Promise<DecryptionResult> {
-    const result = await window.electronAPI.dAsPDecrypt(encryptedDataRaw, reverseKey, passwordOrSk, 'rust', hwid);
+    const result = await window.electronAPI.dArxDecrypt(encryptedDataRaw, reverseKey, passwordOrSk, 'rust', hwid);
 
     if (typeof result === 'string') {
       return { decrypted: result };
@@ -70,7 +70,7 @@ export class CryptService {
   /**
    * High-level helper for binary file encryption.
    */
-  async encryptBinaryDAsP(data: Uint8Array, password: string, pqcPublicKey?: string): Promise<Uint8Array> {
+  async encryptBinaryDArx(data: Uint8Array, password: string, pqcPublicKey?: string): Promise<Uint8Array> {
     return this.encryptBinary(data, pqcPublicKey || password);
   }
 

@@ -28,7 +28,7 @@
 
 The **Darkstar Vault** (`darkstar-vault`) application is a unified, defense-grade sovereign security dashboard built using a modern decoupled architecture. It leverages a shared **Angular** frontend that is deployed to native environments via specialized desktop (**Electron**) and mobile (**Capacitor**) bridges.
 
-Under the hood, Darkstar Vault utilizes the sovereign **D-ASP** (Darkstar Algebraic Substitution & Permutation) post-quantum cryptographic engine from the core [kryklin/darkstar](https://github.com/Kryklin/darkstar) project.
+Under the hood, Darkstar Vault utilizes the sovereign **D-ARX** (Darkstar Algebraic Substitution & Permutation) post-quantum cryptographic engine from the core [kryklin/darkstar](https://github.com/Kryklin/darkstar) project.
 
 ### 💻 Desktop Execution (Electron)
 
@@ -36,7 +36,7 @@ The desktop application uses **Electron** to provide a secure, air-gapped-ready 
 
 ### 📱 Mobile Execution (Capacitor)
 
-For mobile platforms, **Capacitor** bridges the Angular web views to native Android and iOS activities. Hardware-unique identity binding is maintained across all platforms through the standard D-ASP protocol.
+For mobile platforms, **Capacitor** bridges the Angular web views to native Android and iOS activities. Hardware-unique identity binding is maintained across all platforms through the standard D-ARX protocol.
 
 ---
 

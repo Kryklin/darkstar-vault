@@ -8,12 +8,7 @@ const ext = process.platform === 'win32' ? '.exe' : '';
 function getExtraResources() {
   const candidateResources = [
     path.join(__dirname, `bin/d-arx-512${ext}`),
-    path.join(__dirname, `bin/d-asp${ext}`),
-    path.join(__dirname, `bin/main${ext}`),
-    path.join(__dirname, `bin/dasp${ext}`),
-    path.join(__dirname, 'bin/main.js'),
-    path.join(__dirname, 'bin/dasp.py'),
-    path.join(__dirname, 'bin/dasp_crypto.wasm'),
+    path.join(__dirname, `bin/d-arx${ext}`),
     process.env.DARKSTAR_ENGINE_PATH,
   ].filter(Boolean);
 
@@ -73,9 +68,9 @@ module.exports = {
       const ext = process.platform === 'win32' ? '.exe' : '';
       const binDir = path.join(__dirname, 'bin');
       const rustBin = path.join(binDir, `d-arx-512${ext}`);
-      const aspAlias = path.join(binDir, `d-asp${ext}`);
+      const arxAlias = path.join(binDir, `d-arx${ext}`);
 
-      if (!fs.existsSync(rustBin) && !fs.existsSync(aspAlias)) {
+      if (!fs.existsSync(rustBin) && !fs.existsSync(arxAlias)) {
         console.log('\n🔐 Engine binaries missing in ./bin. Fetching from Kryklin/darkstar releases...');
         const { execSync } = require('child_process');
         execSync('npx tsx scripts/fetch-engines.ts', { stdio: 'inherit' });
