@@ -23,8 +23,7 @@ interface AuditItem {
 
   const results: AuditItem[] = [{ name: 'NPM (JavaScript)', status: 'Pending', vulns: 0, cmd: 'npm audit --json', parse: parseNpm }];
 
-  for (let i = 0; i < results.length; i++) {
-    const item = results[i];
+  for (const item of results) {
     const spinner = ora(chalk.blue(`Auditing ${item.name}...`)).start();
     try {
       const { stdout } = await execa(item.cmd, { shell: true });

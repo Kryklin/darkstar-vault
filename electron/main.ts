@@ -570,7 +570,9 @@ async function fetchEngineFromReleases(): Promise<string> {
     if (fsSync.existsSync(archivePath)) {
       try {
         fsSync.unlinkSync(archivePath);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -581,11 +583,15 @@ async function fetchEngineFromReleases(): Promise<string> {
   if (fsSync.existsSync(rustBin) && !fsSync.existsSync(aspAlias)) {
     try {
       fsSync.copyFileSync(rustBin, aspAlias);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   } else if (fsSync.existsSync(aspAlias) && !fsSync.existsSync(rustBin)) {
     try {
       fsSync.copyFileSync(aspAlias, rustBin);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
 
   const activeBin = fsSync.existsSync(rustBin) ? rustBin : aspAlias;

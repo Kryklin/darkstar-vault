@@ -20,8 +20,7 @@ interface FormatJob {
     },
   ];
 
-  for (let i = 0; i < jobs.length; i++) {
-    const job = jobs[i];
+  for (const job of jobs) {
     const spinner = ora(chalk.blue(`Formatting ${job.name}...`)).start();
     try {
       await execa(job.cmd, { shell: true });
