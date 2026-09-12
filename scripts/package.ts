@@ -64,6 +64,7 @@ const pkg = require('../package.json');
     { name: chalk.yellow('  🏗️   Build Production'), value: 'build' },
     { name: chalk.hex('#FFA500')('  📦  Package Application'), value: 'package' },
     { name: chalk.hex('#00ADD8')('  🔐  Generate Checksums'), value: 'checksums' },
+    { name: chalk.cyan('  🎨  Generate Splash Installer GIF'), value: 'splash' },
     { name: chalk.green('  🚀  Publish Release'), value: 'publish' },
 
     new inquirer.Separator(chalk.dim('─── Pipelines ────────────────────────────────────────────')),
@@ -278,6 +279,7 @@ const pkg = require('../package.json');
       CLEAN: 'npm run clean',
       CHECKSUMS: 'npm run checksums',
       VERIFY_ENGINES: 'npx tsx scripts/fetch-engines.ts',
+      SPLASH: 'npm run splash',
     };
 
     // Execute selected action
@@ -357,6 +359,9 @@ const pkg = require('../package.json');
             break;
           case 'build':
             await runShell('Building', CMD.BUILD, { showOutput: true });
+            break;
+          case 'splash':
+            await runShell('Splash Installer Generation', CMD.SPLASH, { showOutput: true });
             break;
           case 'package':
             await ensureEnginesPresent();

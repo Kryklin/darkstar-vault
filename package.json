@@ -29,6 +29,7 @@
     "audit": "npx tsx scripts/audit.ts",
     "fetch:engines": "npx tsx scripts/fetch-engines.ts",
     "rename:arx": "npx tsx scripts/replace-legacy-crypto-names.ts",
+    "splash": "npx tsx scripts/splash-maker.ts",
     "package": "electron-forge package",
     "publish": "electron-forge publish"
   },
