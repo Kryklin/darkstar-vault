@@ -23,7 +23,7 @@ A clear and concise description of what you expected to happen.
 
 ## Environment Details
 
-- **App Version**: [e.g. 3.0.4]
+- **App Version**: [e.g. 3.0.5]
 - **Target Platform**: [e.g. Windows 11 / macOS Sonoma / Ubuntu 24.04 / Android 14 / iOS 17]
 - **Runtime Environment**: [Desktop (Electron) / Mobile (Capacitor)]
 - **D-ARX Engine Status**: [Output of `npm run fetch:engines` or engine binary presence in `./bin/`]

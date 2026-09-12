@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-3.0.4-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.0.5-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/Core_Engine-D--ARX--512-00E5FF?style=for-the-badge" alt="Core Engine">
   <img src="https://img.shields.io/badge/License-CC_BY_4.0-orange?style=for-the-badge" alt="License">
 </p>
