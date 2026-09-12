@@ -1,19 +1,24 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
-title: ''
+name: Feature Request
+about: Propose an architectural enhancement or feature for Darkstar Vault
+title: '[FEAT] '
 labels: enhancement
 assignees: ''
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Problem Context
+Is your feature proposal related to a specific workflow friction or operational limitation? Please describe clearly.
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+## Proposed Solution
+A clear and concise description of what you want to happen. Explain how the proposed feature improves security, UX, or enclave workflows.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Architectural & Cryptographic Impact
+- Does this feature impact the D-ARX-512 core interface or IPC communication?
+- Does this touch platform biometric enclaves (FIDO2 / WebAuthn / Touch ID / Windows Hello)?
+- Note: The vault application strictly delegates cryptographic operations to the native D-ARX core; custom client-side crypto proposals will not be accepted.
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+## Alternatives Considered
+A clear and concise description of any alternative solutions, libraries, or architectural approaches considered.
+
+## Additional Context
+Add any other relevant context, mockups, or hardware integration details.

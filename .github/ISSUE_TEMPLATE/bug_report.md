@@ -1,32 +1,31 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: ''
+name: Bug Report
+about: Report a defect or unexpected behavior in Darkstar Vault
+title: '[BUG] '
 labels: bug
 assignees: ''
 ---
 
-**Describe the bug**
+## Description
 A clear and concise description of what the bug is.
 
-**To Reproduce**
-Steps to reproduce the behavior:
+## Steps to Reproduce
+1. Launch Darkstar Vault (`npm start` or installed build).
+2. Navigate to '...'
+3. Trigger action '...'
+4. See error or unexpected behavior.
 
-1. Go to '...'
-2. Click on '...'
-3. Scroll down to '...'
-4. See error
-
-**Expected behavior**
+## Expected Behavior
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Environment Details
+- **App Version**: [e.g. 3.0.4]
+- **Target Platform**: [e.g. Windows 11 / macOS Sonoma / Ubuntu 24.04 / Android 14 / iOS 17]
+- **Runtime Environment**: [Desktop (Electron) / Mobile (Capacitor)]
+- **D-ARX Engine Status**: [Output of `npm run fetch:engines` or engine binary presence in `./bin/`]
 
-**Desktop (please complete the following information):**
+## Screenshots / Terminal Logs
+If applicable, attach screenshots, recordings, or terminal logs demonstrating the issue. (Ensure no sensitive private keys or mnemonics are visible).
 
-- OS: [e.g. Windows 10]
-- Version [e.g. 1.4.1]
-
-**Additional context**
-Add any other context about the problem here.
+## Additional Context
+Add any other context about the defect or hardware security tokens (e.g. YubiKey, TPM status).

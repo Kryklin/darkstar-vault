@@ -1,24 +1,39 @@
 ## Description
 
-Please include a summary of the change and which issue is fixed.
+Please include a summary of the change, problem addressed, and relevant motivation.
 
-## Type of change
+Fixes #(issue)
 
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] This change requires a documentation update
+## Type of Change
 
-## How Has This Been Tested?
+- [ ] Bug fix (non-breaking change resolving a defect)
+- [ ] New feature (non-breaking change adding functionality)
+- [ ] Breaking change (fix or feature modifying existing contract or interface)
+- [ ] Documentation update
+- [ ] Cryptographic or Enclave security hardening
 
-Please describe the tests that you ran to verify your changes.
+## Verification & Testing
 
-## Checklist:
+Please specify the tests and commands executed to verify changes:
 
-- [ ] My code follows the style guidelines of this project
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
+- [ ] `npm run lint:ts` (Zero linter errors)
+- [ ] `npx tsc --p tsconfig.electron.json --noEmit` (Zero TypeScript compilation errors)
+- [ ] `npm test` (All Karma unit tests pass)
+- [ ] `npm run rename:arx -- --check` (D-ARX naming compliance verified)
+- [ ] `npm run format` (Code cleanly formatted with Prettier)
+
+## Platform Testing
+
+- [ ] Windows (Electron)
+- [ ] macOS (Electron)
+- [ ] Linux (Electron)
+- [ ] Android (Capacitor)
+- [ ] iOS (Capacitor)
+
+## Checklist
+
+- [ ] My code adheres to the project's coding standards and architecture guidelines.
+- [ ] I have performed a self-review of my code.
+- [ ] No sensitive credentials, keys, or memory buffers are logged or serialized to unencrypted disk.
+- [ ] No custom or ad-hoc cryptographic implementations were added (D-ARX-512 core delegation preserved).
+- [ ] Corresponding documentation has been updated.
