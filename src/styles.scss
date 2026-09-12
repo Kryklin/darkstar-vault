@@ -257,7 +257,7 @@ body.light-theme .app-title {
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
   }
 
-  @media (max-width: 600px) {
+  @media (max-width: 768px) {
     flex-direction: column;
     align-items: stretch;
     gap: 16px;
@@ -267,9 +267,12 @@ body.light-theme .app-title {
   .setting-label {
     display: flex;
     flex-direction: column;
-    max-width: 70%;
+    flex: 1;
+    min-width: 0;
+    margin-right: 20px;
 
-    @media (max-width: 600px) {
+    @media (max-width: 768px) {
+      margin-right: 0;
       max-width: 100%;
     }
 
