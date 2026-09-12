@@ -1,0 +1,14 @@
+{
+  "version": "3.0.0",
+  "release": "v3.0.0",
+  "engines": [
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "filename": "d-arx-512.exe",
+      "sha256": "326e568ddfbf2d4025c7265f5e01cb852fad3739613491de35608064029b75cd",
+      "size": 388096
+    }
+  ],
+  "signature": "812a61cdaff908ca9ef507a5db9c74f75c77f87ba5d801834360c98f7e7fe8575ef77af8b3b15ce00b78492290e9dc522eb97d042b718f9d38decc7f2a20b103"
+}

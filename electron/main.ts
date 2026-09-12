@@ -13,6 +13,7 @@ import { authenticator } from 'otplib';
 import { verifyIntegrity, isIntegrityVerified } from './integrity';
 import { DARKSTAR_TRUST_ANCHOR_PUBLIC_KEY, verifyEd25519Signature } from './trust-anchor';
 import { NativeWebAuthnRecord, enrollWebAuthnCredential, verifyWebAuthnAssertion } from './webauthn-verifier';
+import { loadAuthenticatedEngineManifest, verifyEngineBinary } from './engine-trust';
 
 const execFileAsync = promisify(execFile);
 
@@ -31,13 +32,18 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: tru
 
 const SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy':
-    "default-src 'self' app:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' app: https://api.github.com https://fonts.googleapis.com https://fonts.gstatic.com ws://localhost:4200 http://localhost:4200; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+    "default-src 'self' app:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' app: https://api.github.com https://fonts.googleapis.com https://fonts.gstatic.com ws://localhost:4200 http://localhost:4200; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
 };
+
+import { isPathContained, sanitizeVaultFilename, assertValidIpcSender as assertValidIpcSenderUtil } from './security-utils';
+
+const assertValidIpcSender = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) =>
+  assertValidIpcSenderUtil(event, BrowserWindow.fromWebContents, app.isPackaged);
 
 let updaterInitialized = false;
 let isVersionLocked = false;
@@ -222,10 +228,11 @@ app.whenReady().then(async () => {
     const url = new URL(request.url);
     let pathname = url.pathname;
     if (pathname === '/' || pathname === '') pathname = '/index.html';
-    const distPath = path.join(__dirname, '..', '..', 'dist', 'darkstar', 'browser');
-    const fullPath = path.join(distPath, pathname);
+    const distPath = path.resolve(__dirname, '..', '..', 'dist', 'darkstar', 'browser');
+    const relativePart = pathname.startsWith('/') ? pathname.slice(1) : pathname;
+    const fullPath = path.resolve(distPath, relativePart);
     try {
-      if (!fullPath.startsWith(distPath)) return new Response('Forbidden', { status: 403 });
+      if (!isPathContained(distPath, fullPath)) return new Response('Forbidden', { status: 403 });
       const fileContent = await fs.readFile(fullPath);
       const extension = path.extname(fullPath).toLowerCase();
       const mimeTypes: Record<string, string> = {
@@ -304,12 +311,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.on('minimize-window', () => {
+ipcMain.on('minimize-window', (event) => {
+  assertValidIpcSender(event);
   const win = BrowserWindow.getFocusedWindow();
   if (win) win.minimize();
 });
 
-ipcMain.on('maximize-window', () => {
+ipcMain.on('maximize-window', (event) => {
+  assertValidIpcSender(event);
   const win = BrowserWindow.getFocusedWindow();
   if (win) {
     if (win.isMaximized()) win.unmaximize();
@@ -317,12 +326,14 @@ ipcMain.on('maximize-window', () => {
   }
 });
 
-ipcMain.on('close-window', () => {
+ipcMain.on('close-window', (event) => {
+  assertValidIpcSender(event);
   const win = BrowserWindow.getFocusedWindow();
   if (win) win.close();
 });
 
-ipcMain.on('check-for-updates', () => {
+ipcMain.on('check-for-updates', (event) => {
+  assertValidIpcSender(event);
   if (isVersionLocked) {
     sendStatusToWindow('locked', 'Update check blocked: Version is locked.');
     return;
@@ -330,36 +341,58 @@ ipcMain.on('check-for-updates', () => {
   autoUpdater.checkForUpdates();
 });
 
-ipcMain.handle('create-shortcut', async (_event, target: 'desktop' | 'start-menu') => {
+ipcMain.handle('create-shortcut', async (event, target: 'desktop' | 'start-menu') => {
+  assertValidIpcSender(event);
+  if (target !== 'desktop' && target !== 'start-menu') {
+    throw new Error('Invalid shortcut target');
+  }
   if (process.platform !== 'win32') return { success: false, message: 'Windows only.' };
   return await createShortcut(target);
 });
 
-ipcMain.on('set-version-lock', (_event, locked: boolean) => {
-  isVersionLocked = locked;
-  if (!locked) initUpdater();
+ipcMain.on('set-version-lock', (event, locked: boolean) => {
+  assertValidIpcSender(event);
+  // Security policy: version locking is main-process controlled and cannot be disabled via renderer IPC.
+  if (locked) {
+    isVersionLocked = true;
+  } else {
+    console.warn('[Security] Ignored renderer IPC attempt to disable version locking policy.');
+  }
 });
 
-ipcMain.handle('reset-app', async () => {
+ipcMain.handle('reset-app', async (event) => {
+  assertValidIpcSender(event);
   await session.defaultSession.clearStorageData();
   app.relaunch();
   app.exit(0);
 });
 
-ipcMain.handle('safe-storage-encrypt', async (_event, plainText: string) => {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('Encryption not available.');
+ipcMain.handle('safe-storage-encrypt', async (event, plainText: string) => {
+  assertValidIpcSender(event);
+  if (typeof plainText !== 'string' || plainText.length > 50 * 1024 * 1024) {
+    throw new Error('Invalid plainText argument');
+  }
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('OS-backed secure storage (Electron safeStorage) is unavailable.');
   return safeStorage.encryptString(plainText).toString('base64');
 });
 
-ipcMain.handle('safe-storage-decrypt', async (_event, encryptedBase64: string) => {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('Encryption not available.');
+ipcMain.handle('safe-storage-decrypt', async (event, encryptedBase64: string) => {
+  assertValidIpcSender(event);
+  if (typeof encryptedBase64 !== 'string' || encryptedBase64.length > 100 * 1024 * 1024) {
+    throw new Error('Invalid encryptedBase64 argument');
+  }
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('OS-backed secure storage (Electron safeStorage) is unavailable.');
   const buffer = Buffer.from(encryptedBase64, 'base64');
   return safeStorage.decryptString(buffer);
 });
 
-ipcMain.handle('safe-storage-available', () => safeStorage.isEncryptionAvailable());
+ipcMain.handle('safe-storage-available', (event) => {
+  assertValidIpcSender(event);
+  return safeStorage.isEncryptionAvailable();
+});
 
-ipcMain.handle('get-machine-id', () => {
+ipcMain.handle('get-machine-id', (event) => {
+  assertValidIpcSender(event);
   try {
     return machineIdSync();
   } catch {
@@ -367,15 +400,23 @@ ipcMain.handle('get-machine-id', () => {
   }
 });
 
-ipcMain.handle('check-integrity', () => isIntegrityVerified());
+ipcMain.handle('check-integrity', (event) => {
+  assertValidIpcSender(event);
+  return isIntegrityVerified();
+});
 
-ipcMain.handle('vault-generate-totp', () => {
+ipcMain.handle('vault-generate-totp', (event) => {
+  assertValidIpcSender(event);
   const secret = authenticator.generateSecret();
   const uri = authenticator.keyuri('user', 'Darkstar', secret);
   return { secret, uri };
 });
 
-ipcMain.handle('vault-verify-totp', (_event, token: string, secret: string) => {
+ipcMain.handle('vault-verify-totp', (event, token: string, secret: string) => {
+  assertValidIpcSender(event);
+  if (typeof token !== 'string' || typeof secret !== 'string' || token.length > 32 || secret.length > 128) {
+    return false;
+  }
   try {
     return authenticator.check(token, secret);
   } catch {
@@ -384,45 +425,91 @@ ipcMain.handle('vault-verify-totp', (_event, token: string, secret: string) => {
 });
 
 const getVaultPath = () => path.join(app.getPath('userData'), 'vault_storage');
+const MAX_VAULT_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 
-ipcMain.handle('vault-ensure-dir', async () => {
+ipcMain.handle('vault-ensure-dir', async (event) => {
+  assertValidIpcSender(event);
   try {
-    await fs.mkdir(getVaultPath(), { recursive: true });
+    await fs.mkdir(getVaultPath(), { recursive: true, mode: 0o700 });
     return true;
   } catch {
     return false;
   }
 });
 
-ipcMain.handle('vault-save-file', async (_event, filename: string, buffer: Buffer) => {
-  const filePath = path.join(getVaultPath(), filename);
-  if (path.basename(filePath) !== filename) throw new Error('Invalid filename');
-  await fs.writeFile(filePath, buffer);
-  return true;
+ipcMain.handle('vault-save-file', async (event, filename: string, buffer: Buffer | Uint8Array) => {
+  assertValidIpcSender(event);
+  const cleanFilename = sanitizeVaultFilename(filename);
+  if (!buffer || (!Buffer.isBuffer(buffer) && !(buffer instanceof Uint8Array))) {
+    throw new Error('Invalid file payload: buffer required');
+  }
+  if (buffer.length > MAX_VAULT_FILE_SIZE) {
+    throw new Error(`File size exceeds maximum allowed vault limit (${MAX_VAULT_FILE_SIZE} bytes)`);
+  }
+
+  const vaultDir = getVaultPath();
+  const filePath = path.resolve(vaultDir, cleanFilename);
+  if (!isPathContained(vaultDir, filePath)) {
+    throw new Error('Path traversal violation in vault storage');
+  }
+
+  await fs.mkdir(vaultDir, { recursive: true, mode: 0o700 });
+
+  // Atomic write via temp file + 0o600 permissions
+  const tempPath = path.join(vaultDir, `.${cleanFilename}.${crypto.randomBytes(8).toString('hex')}.tmp`);
+  try {
+    await fs.writeFile(tempPath, buffer, { mode: 0o600 });
+    await fs.rename(tempPath, filePath);
+    try {
+      await fs.chmod(filePath, 0o600);
+    } catch {
+      /* ignore Windows chmod limitations */
+    }
+    return true;
+  } finally {
+    try {
+      if (fsSync.existsSync(tempPath)) await fs.unlink(tempPath);
+    } catch {
+      /* ignore */
+    }
+  }
 });
 
-ipcMain.handle('vault-read-file', async (_event, filename: string) => {
-  const filePath = path.join(getVaultPath(), filename);
-  if (path.basename(filePath) !== filename) throw new Error('Invalid filename');
+ipcMain.handle('vault-read-file', async (event, filename: string) => {
+  assertValidIpcSender(event);
+  const cleanFilename = sanitizeVaultFilename(filename);
+  const vaultDir = getVaultPath();
+  const filePath = path.resolve(vaultDir, cleanFilename);
+  if (!isPathContained(vaultDir, filePath)) {
+    throw new Error('Path traversal violation in vault storage');
+  }
   return await fs.readFile(filePath);
 });
 
-ipcMain.handle('vault-delete-file', async (_event, filename: string) => {
-  const filePath = path.join(getVaultPath(), filename);
-  if (path.basename(filePath) !== filename) throw new Error('Invalid filename');
+ipcMain.handle('vault-delete-file', async (event, filename: string) => {
+  assertValidIpcSender(event);
+  const cleanFilename = sanitizeVaultFilename(filename);
+  const vaultDir = getVaultPath();
+  const filePath = path.resolve(vaultDir, cleanFilename);
+  if (!isPathContained(vaultDir, filePath)) {
+    throw new Error('Path traversal violation in vault storage');
+  }
   await fs.unlink(filePath);
   return true;
 });
 
-ipcMain.handle('vault-list-files', async () => {
+ipcMain.handle('vault-list-files', async (event) => {
+  assertValidIpcSender(event);
   try {
-    return await fs.readdir(getVaultPath());
+    const files = await fs.readdir(getVaultPath());
+    return files.filter((f) => !f.startsWith('.'));
   } catch {
     return [];
   }
 });
 
-ipcMain.on('restart-and-install', () => {
+ipcMain.on('restart-and-install', (event) => {
+  assertValidIpcSender(event);
   if (isVersionLocked) {
     sendStatusToWindow('locked', 'Restart and install blocked: Version is locked.');
     return;
@@ -450,21 +537,48 @@ autoUpdater.on('update-downloaded', () => {
   if (win) win.webContents.send('update-status', { status: 'downloaded' });
 });
 
-ipcMain.handle('get-default-backup-path', () => path.join(app.getPath('documents'), 'DarkstarBackups'));
+ipcMain.handle('get-default-backup-path', (event) => {
+  assertValidIpcSender(event);
+  return path.join(app.getPath('documents'), 'DarkstarBackups');
+});
 
-ipcMain.handle('save-backup', async (_event, dir: string, filename: string, data: string) => {
+ipcMain.handle('save-backup', async (event, dir: string, filename: string, data: string) => {
+  assertValidIpcSender(event);
   try {
-    // Validate filename against strict pattern to prevent path traversal
-    const cleanFilename = path.basename(filename);
-    if (!/^[a-zA-Z0-9_\-.]+\.backup$/.test(cleanFilename) || cleanFilename !== filename) {
-      throw new Error('Invalid backup filename: directory traversal or illegal characters detected.');
+    if (typeof dir !== 'string' || typeof filename !== 'string' || typeof data !== 'string') {
+      throw new Error('Invalid arguments: dir, filename, and data must be strings.');
+    }
+    if (data.length > MAX_VAULT_FILE_SIZE) {
+      throw new Error('Backup data exceeds maximum permitted size.');
+    }
+    const cleanFilename = sanitizeVaultFilename(filename);
+    if (!cleanFilename.endsWith('.backup')) {
+      throw new Error('Invalid backup filename: must end with .backup');
     }
 
     const safeTarget = path.resolve(dir, cleanFilename);
-    await fs.mkdir(dir, { recursive: true });
-    // Restrict permissions to user-only read/write (0o600)
-    await fs.writeFile(safeTarget, data, { encoding: 'utf-8', mode: 0o600 });
-    return true;
+    if (!isPathContained(dir, safeTarget)) {
+      throw new Error('Path traversal violation in backup destination');
+    }
+
+    await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+    const tempTarget = path.join(dir, `.${cleanFilename}.${crypto.randomBytes(8).toString('hex')}.tmp`);
+    try {
+      await fs.writeFile(tempTarget, data, { encoding: 'utf-8', mode: 0o600 });
+      await fs.rename(tempTarget, safeTarget);
+      try {
+        await fs.chmod(safeTarget, 0o600);
+      } catch {
+        /* ignore */
+      }
+      return true;
+    } finally {
+      try {
+        if (fsSync.existsSync(tempTarget)) await fs.unlink(tempTarget);
+      } catch {
+        /* ignore */
+      }
+    }
   } catch (err) {
     console.error('Save Backup Failure:', err);
     return false;
@@ -472,12 +586,14 @@ ipcMain.handle('save-backup', async (_event, dir: string, filename: string, data
 });
 
 ipcMain.handle('show-directory-picker', async (event) => {
+  assertValidIpcSender(event);
   const win = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePaths } = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] });
   return canceled ? null : filePaths[0];
 });
 
 ipcMain.handle('show-file-picker', async (event) => {
+  assertValidIpcSender(event);
   const win = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePaths } = await dialog.showOpenDialog(win!, {
     properties: ['openFile'],
@@ -486,8 +602,12 @@ ipcMain.handle('show-file-picker', async (event) => {
   return canceled ? null : filePaths[0];
 });
 
-ipcMain.handle('open-backup', async (_event, filePath: string) => {
+ipcMain.handle('open-backup', async (event, filePath: string) => {
+  assertValidIpcSender(event);
   try {
+    if (typeof filePath !== 'string' || !filePath || filePath.includes('\0')) {
+      throw new Error('Invalid file path');
+    }
     const resolvedPath = path.resolve(filePath);
     if (!resolvedPath.toLowerCase().endsWith('.backup')) {
       throw new Error('Invalid backup file extension.');
@@ -694,58 +814,93 @@ async function fetchEngineFromReleases(): Promise<string> {
   }
   console.log('[Darkstar Engine] Cryptographic release provenance verified via Ed25519 digital signature.');
 
-  fsSync.writeFileSync(archivePath, fileBuffer);
+  // Extract in an isolated temporary directory to ensure atomic installation
+  const isolatedTempDir = path.join(targetBinDir, `.extract_${crypto.randomBytes(8).toString('hex')}`);
+  fsSync.mkdirSync(isolatedTempDir, { recursive: true, mode: 0o700 });
+  const isolatedArchive = path.join(isolatedTempDir, targetAsset.name);
+  fsSync.writeFileSync(isolatedArchive, fileBuffer);
 
-  console.log(`[Darkstar Engine] Extracting archive...`);
+  console.log(`[Darkstar Engine] Extracting archive in isolated environment...`);
   try {
-    if (archivePath.endsWith('.zip')) {
-      execSync(`tar -xf "${archivePath}" -C "${targetBinDir}"`);
-    } else if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
-      execSync(`tar -xzf "${archivePath}" -C "${targetBinDir}"`);
+    if (isolatedArchive.endsWith('.zip')) {
+      execSync(`tar -xf "${isolatedArchive}" -C "${isolatedTempDir}"`);
+    } else if (isolatedArchive.endsWith('.tar.gz') || isolatedArchive.endsWith('.tgz')) {
+      execSync(`tar -xzf "${isolatedArchive}" -C "${isolatedTempDir}"`);
     }
   } catch (_tarErr) {
     if (isWindows) {
-      execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${targetBinDir}' -Force"`);
+      execSync(`powershell -Command "Expand-Archive -Path '${isolatedArchive}' -DestinationPath '${isolatedTempDir}' -Force"`);
     } else {
       throw _tarErr;
     }
   } finally {
-    if (fsSync.existsSync(archivePath)) {
+    if (fsSync.existsSync(isolatedArchive)) {
       try {
-        fsSync.unlinkSync(archivePath);
+        fsSync.unlinkSync(isolatedArchive);
       } catch {
         /* ignore */
       }
     }
   }
 
-  const rustBin = path.join(targetBinDir, `d-arx-512${ext}`);
-  const arxAlias = path.join(targetBinDir, `d-arx${ext}`);
+  const extractedRustBin = path.join(isolatedTempDir, `d-arx-512${ext}`);
+  const extractedArxAlias = path.join(isolatedTempDir, `d-arx${ext}`);
+  const extractedActive = fsSync.existsSync(extractedRustBin) ? extractedRustBin : extractedArxAlias;
 
-  // Maintain alias parity so either binary name works
-  if (fsSync.existsSync(rustBin) && !fsSync.existsSync(arxAlias)) {
+  if (!fsSync.existsSync(extractedActive)) {
     try {
-      fsSync.copyFileSync(rustBin, arxAlias);
+      fsSync.rmSync(isolatedTempDir, { recursive: true, force: true });
     } catch {
       /* ignore */
     }
-  } else if (fsSync.existsSync(arxAlias) && !fsSync.existsSync(rustBin)) {
+    throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-arx${ext} was found in download.`);
+  }
+
+  // Mandatory manifest verification against Darkstar Trust Anchor
+  const manifest = loadAuthenticatedEngineManifest();
+  const verifyRes = await verifyEngineBinary(extractedActive, manifest);
+  if (!verifyRes.valid) {
     try {
-      fsSync.copyFileSync(arxAlias, rustBin);
+      fsSync.rmSync(isolatedTempDir, { recursive: true, force: true });
     } catch {
       /* ignore */
     }
+    throw new Error(`Release engine failed authenticated manifest verification:\n${verifyRes.error}`);
   }
 
-  const activeBin = fsSync.existsSync(rustBin) ? rustBin : arxAlias;
-  if (!fsSync.existsSync(activeBin)) {
-    throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-arx${ext} was found in ${targetBinDir}`);
+  // Self-test verification inside isolated directory
+  try {
+    await execFileAsync(extractedActive, ['test']);
+  } catch (testErr) {
+    try {
+      fsSync.rmSync(isolatedTempDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`Downloaded engine binary failed operational self-test: ${(testErr as Error).message}`);
   }
 
-  // Self-test verification
-  await execFileAsync(activeBin, ['test']);
-  console.log(`[Darkstar Engine] Operational native engine ready: ${activeBin}`);
-  return activeBin;
+  // Atomically move/copy to targetBinDir
+  const finalRustBin = path.join(targetBinDir, `d-arx-512${ext}`);
+  const finalArxAlias = path.join(targetBinDir, `d-arx${ext}`);
+
+  fsSync.copyFileSync(extractedActive, finalRustBin);
+  fsSync.copyFileSync(extractedActive, finalArxAlias);
+
+  try {
+    fsSync.rmSync(isolatedTempDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+
+  // Post-installation verification
+  const postVerify = await verifyEngineBinary(finalRustBin, manifest);
+  if (!postVerify.valid) {
+    throw new Error(`Post-installation trust verification failed for ${finalRustBin}: ${postVerify.error}`);
+  }
+
+  console.log(`[Darkstar Engine] Operational authenticated native engine ready: ${finalRustBin}`);
+  return finalRustBin;
 }
 
 /**
@@ -798,6 +953,13 @@ async function runDArxCommand(args: string[]): Promise<unknown> {
     );
   }
 
+  // Cryptographic Engine Trust Verification against Authenticated Manifest
+  const manifest = loadAuthenticatedEngineManifest();
+  const verifyRes = await verifyEngineBinary(foundBinary, manifest);
+  if (!verifyRes.valid) {
+    throw new Error(`Engine Execution Blocked: Binary at ${foundBinary} failed cryptographic trust verification:\n${verifyRes.error}`);
+  }
+
   try {
     const { stdout } = await execFileAsync(foundBinary, args);
     try {
@@ -811,7 +973,14 @@ async function runDArxCommand(args: string[]): Promise<unknown> {
   }
 }
 
-ipcMain.handle('darx-encrypt', async (_event, payload: string, pkHex: string, _engine?: string, hwid?: string) => {
+ipcMain.handle('darx-encrypt', async (event, payload: string, pkHex: string, _engine?: string, hwid?: string) => {
+  assertValidIpcSender(event);
+  if (typeof payload !== 'string' || typeof pkHex !== 'string') {
+    throw new Error('Invalid payload or public key argument');
+  }
+  if (payload.length > 100 * 1024 * 1024 || pkHex.length > 256) {
+    throw new Error('Argument size exceeds maximum permitted limit');
+  }
   const cleanHwid = sanitizeHwid(hwid);
   const args: string[] = ['--diagnostic'];
   if (cleanHwid) {
@@ -829,7 +998,14 @@ ipcMain.handle('darx-encrypt', async (_event, payload: string, pkHex: string, _e
   }
 });
 
-ipcMain.handle('darx-decrypt', async (_event, data: string, _rk: string, skHex: string, _engine?: string, hwid?: string) => {
+ipcMain.handle('darx-decrypt', async (event, data: string, _rk: string, skHex: string, _engine?: string, hwid?: string) => {
+  assertValidIpcSender(event);
+  if (typeof data !== 'string' || typeof skHex !== 'string') {
+    throw new Error('Invalid ciphertext or private key argument');
+  }
+  if (data.length > 200 * 1024 * 1024 || skHex.length > 256) {
+    throw new Error('Argument size exceeds maximum permitted limit');
+  }
   const cleanHwid = sanitizeHwid(hwid);
   const args: string[] = ['--diagnostic'];
   if (cleanHwid) {
@@ -847,7 +1023,8 @@ ipcMain.handle('darx-decrypt', async (_event, data: string, _rk: string, skHex: 
   }
 });
 
-ipcMain.handle('darx-check-engine', async () => {
+ipcMain.handle('darx-check-engine', async (event) => {
+  assertValidIpcSender(event);
   const candidatePaths = getEngineCandidatePaths();
   const existingPath = candidatePaths.find((p) => {
     try {
@@ -862,6 +1039,16 @@ ipcMain.handle('darx-check-engine', async () => {
   }
 
   try {
+    const manifest = loadAuthenticatedEngineManifest();
+    const verifyRes = await verifyEngineBinary(existingPath, manifest);
+    if (!verifyRes.valid) {
+      return {
+        operational: false,
+        binaryPath: existingPath,
+        error: `Engine trust verification failed: ${verifyRes.error}`,
+      };
+    }
+
     await execFileAsync(existingPath, ['test']);
     return {
       operational: true,
@@ -877,7 +1064,8 @@ ipcMain.handle('darx-check-engine', async () => {
   }
 });
 
-ipcMain.handle('darx-fetch-engine', async () => {
+ipcMain.handle('darx-fetch-engine', async (event) => {
+  assertValidIpcSender(event);
   if (isVersionLocked) {
     return { success: false, error: 'Engine download blocked: Version is locked.' };
   }
@@ -923,7 +1111,11 @@ async function saveNativeWebAuthnRegistry(registry: Record<string, NativeWebAuth
   await fs.writeFile(regPath, payload, { mode: 0o600 });
 }
 
-ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action: 'create' | 'get'; publicKey: unknown }) => {
+ipcMain.handle('biometric-handshake', async (event, options: { action: 'create' | 'get'; publicKey: unknown }) => {
+  assertValidIpcSender(event);
+  if (!options || (options.action !== 'create' && options.action !== 'get') || !options.publicKey || typeof options.publicKey !== 'object') {
+    throw new Error('Invalid biometric-handshake options.');
+  }
   return new Promise((resolve) => {
     let server: http.Server | null = null;
     let handshakeWin: BrowserWindow | null = null;
@@ -1056,12 +1248,20 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
           };
 
           try {
+            const enrollChallenge = (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge;
+            if (!enrollChallenge) {
+              return resolve({ success: false, error: 'Native enrollment failed: mandatory challenge missing from options.' });
+            }
+
             const registry = await loadNativeWebAuthnRegistry();
             const enrollRes = await enrollWebAuthnCredential({
               rawId: respData.rawId,
               publicKey: respData.publicKey,
               clientDataJSON: respData.response?.clientDataJSON,
+              attestationObject: respData.response?.attestationObject,
               expectedOrigin,
+              expectedRpId: (options as { publicKey?: { rp?: { id?: string } } }).publicKey?.rp?.id || 'localhost',
+              expectedChallenge: enrollChallenge,
               registry,
               onPersistRegistry: async (reg) => {
                 await saveNativeWebAuthnRegistry(reg);
@@ -1092,6 +1292,11 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
           };
 
           try {
+            const assertionChallenge = (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge;
+            if (!assertionChallenge) {
+              return resolve({ success: false, error: 'Native assertion failed: mandatory challenge missing from options.' });
+            }
+
             const registry = await loadNativeWebAuthnRegistry();
             const verifyRes = await verifyWebAuthnAssertion({
               rawId: respData.rawId,
@@ -1100,7 +1305,7 @@ ipcMain.handle('biometric-handshake', async (_event: unknown, options: { action:
               signature: respData.response?.signature,
               expectedOrigin,
               expectedRpId: (options as { publicKey?: { rpId?: string } }).publicKey?.rpId || 'localhost',
-              expectedChallenge: (options as { publicKey?: { challenge?: number[] | Uint8Array } }).publicKey?.challenge,
+              expectedChallenge: assertionChallenge,
               registry,
               onPersistRegistry: async (reg) => {
                 await saveNativeWebAuthnRegistry(reg);

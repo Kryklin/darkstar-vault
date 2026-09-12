@@ -73,7 +73,7 @@ describe('CryptService - Authenticated Streaming & Legacy Container Security', (
     const tamperedPayload = new TextEncoder().encode(JSON.stringify(container));
 
     await expectAsync(service.decryptBinary(tamperedPayload, 'test-key')).toBeRejectedWithError(
-      /Streaming integrity violation.*expected 5 chunks/
+      /Streaming integrity violation.*(expected 5 chunks|does not match totalChunks \(5\))/
     );
   });
 
@@ -83,7 +83,7 @@ describe('CryptService - Authenticated Streaming & Legacy Container Security', (
 
     const containerStr = new TextDecoder().decode(encrypted);
     const container = JSON.parse(containerStr);
-    container.streamId = 'tampered-stream-id-000'; // Tampered streamId!
+    container.streamId = '0123456789abcdef0123456789abcdef'; // Tampered streamId with valid 32-hex format
 
     const tamperedPayload = new TextEncoder().encode(JSON.stringify(container));
 
@@ -128,7 +128,7 @@ describe('CryptService - Authenticated Streaming & Legacy Container Security', (
 
     // When totalChunks in outer container is not updated, chunks.length mismatch is caught
     await expectAsync(service.decryptBinary(tamperedPayload, 'test-key')).toBeRejectedWithError(
-      /Streaming integrity violation.*expected \d+ chunks, found \d+/
+      /Streaming integrity violation.*(expected \d+ chunks, found \d+|does not match totalChunks)/
     );
 
     // Even if attacker updates outer totalChunks to match, inner chunk count authentication catches it
@@ -190,6 +190,85 @@ describe('CryptService - Authenticated Streaming & Legacy Container Security', (
     const payload = new TextEncoder().encode(JSON.stringify(unrecognizedContainer));
     await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
       /Streaming integrity violation: invalid or unauthenticated container/
+    );
+  });
+
+  it('should reject malformed or non-hex streamId', async () => {
+    const originalData = new Uint8Array([1, 2, 3]);
+    const encrypted = await service.encryptBinary(originalData, 'test-key');
+    const container = JSON.parse(new TextDecoder().decode(encrypted));
+
+    container.streamId = 'not-valid-hex-length-too-short';
+    const payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid streamId format/
+    );
+  });
+
+  it('should reject non-integer, negative, or overflowing totalChunks (adversarial)', async () => {
+    const originalData = new Uint8Array([1, 2, 3]);
+    const encrypted = await service.encryptBinary(originalData, 'test-key');
+    const container = JSON.parse(new TextDecoder().decode(encrypted));
+
+    // Non-integer totalChunks
+    container.totalChunks = 1.5;
+    let payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds totalChunks/
+    );
+
+    // Negative totalChunks
+    container.totalChunks = -1;
+    payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds totalChunks/
+    );
+
+    // Overflowing totalChunks
+    container.totalChunks = 2_000_000;
+    payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds totalChunks/
+    );
+  });
+
+  it('should reject non-integer, negative, or overflowing totalSize (adversarial)', async () => {
+    const originalData = new Uint8Array([1, 2, 3]);
+    const encrypted = await service.encryptBinary(originalData, 'test-key');
+    const container = JSON.parse(new TextDecoder().decode(encrypted));
+
+    // Negative totalSize
+    container.totalSize = -100;
+    let payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds totalSize/
+    );
+
+    // Overflowing totalSize (>10GB)
+    container.totalSize = 11 * 1024 * 1024 * 1024;
+    payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds totalSize/
+    );
+  });
+
+  it('should reject non-integer or out-of-bounds chunkSize (adversarial)', async () => {
+    const originalData = new Uint8Array([1, 2, 3]);
+    const encrypted = await service.encryptBinary(originalData, 'test-key');
+    const container = JSON.parse(new TextDecoder().decode(encrypted));
+
+    // Zero chunkSize
+    container.chunkSize = 0;
+    let payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds chunkSize/
+    );
+
+    // Overflowing chunkSize (>64MB)
+    container.chunkSize = 100 * 1024 * 1024;
+    payload = new TextEncoder().encode(JSON.stringify(container));
+    await expectAsync(service.decryptBinary(payload, 'test-key')).toBeRejectedWithError(
+      /Streaming integrity violation: invalid or out-of-bounds chunkSize/
     );
   });
 });

@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { verifyEd25519Signature } from '../electron/trust-anchor';
+import { loadAuthenticatedEngineManifest, verifyEngineBinary } from '../electron/engine-trust';
 
 interface ReleaseAsset {
   name: string;
@@ -191,55 +192,90 @@ export async function fetchEngines(force = false): Promise<boolean> {
     }
     sigSpinner.succeed(chalk.green('Release manifest authenticated via Darkstar Ed25519 Trust Anchor.'));
 
-    fs.writeFileSync(archivePath, fileBuffer);
     downloadSpinner.succeed(chalk.green(`Downloaded & verified ${targetAsset.name}`));
 
-    const extractSpinner = ora(chalk.blue('Extracting archive into ./bin...')).start();
+    // Isolated extraction to prevent partial or unverified binaries from touching ./bin
+    const isolatedTempDir = path.join(binDir, `.extract_${crypto.randomBytes(8).toString('hex')}`);
+    fs.mkdirSync(isolatedTempDir, { recursive: true });
+    const isolatedArchive = path.join(isolatedTempDir, targetAsset.name);
+    fs.writeFileSync(isolatedArchive, fileBuffer);
+
+    const extractSpinner = ora(chalk.blue('Extracting archive into isolated staging area...')).start();
     try {
-      if (archivePath.endsWith('.zip')) {
-        execSync(`tar -xf "${archivePath}" -C "${binDir}"`);
-      } else if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
-        execSync(`tar -xzf "${archivePath}" -C "${binDir}"`);
+      if (isolatedArchive.endsWith('.zip')) {
+        execSync(`tar -xf "${isolatedArchive}" -C "${isolatedTempDir}"`);
+      } else if (isolatedArchive.endsWith('.tar.gz') || isolatedArchive.endsWith('.tgz')) {
+        execSync(`tar -xzf "${isolatedArchive}" -C "${isolatedTempDir}"`);
       }
-      fs.unlinkSync(archivePath);
-      extractSpinner.succeed(chalk.green('Archive extracted successfully.'));
+      fs.unlinkSync(isolatedArchive);
+      extractSpinner.succeed(chalk.green('Archive staged successfully.'));
     } catch (_extractErr: unknown) {
       extractSpinner.fail(chalk.red('Failed to extract with tar. Trying PowerShell Expand-Archive...'));
       try {
-        execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${binDir}' -Force"`);
-        if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath);
+        execSync(`powershell -Command "Expand-Archive -Path '${isolatedArchive}' -DestinationPath '${isolatedTempDir}' -Force"`);
+        if (fs.existsSync(isolatedArchive)) fs.unlinkSync(isolatedArchive);
         extractSpinner.succeed(chalk.green('Archive extracted via PowerShell.'));
       } catch (psErr: unknown) {
+        try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
         throw new Error(`Extraction failed: ${(psErr as Error).message}`);
       }
     }
 
-    // Ensure alias parity: copy/alias so both d-arx-512.exe and d-arx.exe exist
-    if (fs.existsSync(rustBin) && !fs.existsSync(arxAlias)) {
-      fs.copyFileSync(rustBin, arxAlias);
-    } else if (fs.existsSync(arxAlias) && !fs.existsSync(rustBin)) {
-      fs.copyFileSync(arxAlias, rustBin);
+    const stagedRustBin = path.join(isolatedTempDir, `d-arx-512${ext}`);
+    const stagedArxAlias = path.join(isolatedTempDir, `d-arx${ext}`);
+    const stagedActive = fs.existsSync(stagedRustBin) ? stagedRustBin : stagedArxAlias;
+
+    if (!fs.existsSync(stagedActive)) {
+      try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      throw new Error(`Archive extracted but neither d-arx-512${ext} nor d-arx${ext} found in staging directory.`);
     }
 
-    // Self-test verification (Strict fail-closed enforcement)
-    const activeBin = fs.existsSync(rustBin) ? rustBin : arxAlias;
-    const testSpinner = ora(chalk.blue('Running cryptographic engine self-test...')).start();
+    // Authenticate binary against signed Engine Manifest
+    const manifestSpinner = ora(chalk.blue('Verifying executable against Authenticated Engine Manifest...')).start();
+    const manifest = loadAuthenticatedEngineManifest();
+    const verifyResult = await verifyEngineBinary(stagedActive, manifest);
+    if (!verifyResult.valid) {
+      manifestSpinner.fail(chalk.red(`Engine manifest verification FAILED: ${verifyResult.error}`));
+      try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      throw new Error(`Engine verification failed: ${verifyResult.error}`);
+    }
+    manifestSpinner.succeed(chalk.green(`Engine binary SHA-256 and size verified against Authenticated Manifest.`));
+
+    // Self-test verification in isolated staging area
+    const testSpinner = ora(chalk.blue('Running cryptographic engine self-test in staging...')).start();
     try {
-      execSync(`"${activeBin}" test`, { stdio: 'pipe' });
+      execSync(`"${stagedActive}" test`, { stdio: 'pipe' });
       testSpinner.succeed(chalk.green('Engine self-test PASSED! Cryptographic engine is operational.'));
-      console.log(chalk.bold.green(`\n✨ Darkstar native engine is ready at: ${activeBin}\n`));
-      return true;
     } catch (testErr: unknown) {
       testSpinner.fail(chalk.red(`Cryptographic engine self-test FAILED: ${(testErr as Error).message}`));
-      // Clean up failed/compromised binaries immediately to fail closed
+      try { fs.rmSync(isolatedTempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      return false;
+    }
+
+    // Atomically install verified binaries into binDir
+    fs.copyFileSync(stagedActive, rustBin);
+    fs.copyFileSync(stagedActive, arxAlias);
+
+    // Clean up staging directory
+    try {
+      fs.rmSync(isolatedTempDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+
+    // Post-installation verification
+    const activeBin = fs.existsSync(rustBin) ? rustBin : arxAlias;
+    const postVerify = await verifyEngineBinary(activeBin, manifest);
+    if (!postVerify.valid) {
       try {
         if (fs.existsSync(rustBin)) fs.unlinkSync(rustBin);
         if (fs.existsSync(arxAlias)) fs.unlinkSync(arxAlias);
-      } catch {
-        /* ignore */
-      }
-      return false;
+      } catch { /* ignore */ }
+      throw new Error(`Post-installation trust check failed: ${postVerify.error}`);
     }
+
+    console.log(chalk.bold.green(`\n✨ Darkstar authenticated native engine is ready at: ${activeBin}\n`));
+    return true;
   } catch (err: unknown) {
     spinner.fail(chalk.red('Failed to obtain native engine from releases.'));
     console.error(chalk.dim((err as Error).message));

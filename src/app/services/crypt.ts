@@ -114,19 +114,60 @@ export class CryptService {
       );
     }
 
-    // Version 2: Authenticated Streaming Container (Strictly Required)
-    if (!parsed || typeof parsed !== 'object' || parsed['magic'] !== 'DARX-STRM' || parsed['v'] !== 2 || !Array.isArray(parsed['chunks'])) {
+    const MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024; // 10 GB limit
+    const MAX_CHUNKS = 1_000_000; // 1M chunk limit
+    const MAX_CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB frame ceiling
+
+    // Strict v2 structure & type validation
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Streaming integrity violation: container must be a JSON object.');
+    }
+
+    if (parsed['magic'] !== 'DARX-STRM' || parsed['v'] !== 2) {
       throw new Error('Streaming integrity violation: invalid or unauthenticated container. Expected authenticated v2 DARX-STRM container.');
     }
 
-    if (parsed['chunks'].length !== parsed['totalChunks']) {
-      throw new Error(`Streaming integrity violation: expected ${parsed['totalChunks']} chunks, found ${parsed['chunks'].length}.`);
+    if (typeof parsed['streamId'] !== 'string' || !/^[a-fA-F0-9]{32}$/.test(parsed['streamId'])) {
+      throw new Error('Streaming integrity violation: invalid streamId format. Expected 32-character hex identifier.');
+    }
+
+    if (
+      typeof parsed['totalChunks'] !== 'number' ||
+      !Number.isInteger(parsed['totalChunks']) ||
+      parsed['totalChunks'] <= 0 ||
+      parsed['totalChunks'] > MAX_CHUNKS
+    ) {
+      throw new Error('Streaming integrity violation: invalid or out-of-bounds totalChunks.');
+    }
+
+    if (
+      typeof parsed['totalSize'] !== 'number' ||
+      !Number.isInteger(parsed['totalSize']) ||
+      parsed['totalSize'] < 0 ||
+      parsed['totalSize'] > MAX_TOTAL_SIZE
+    ) {
+      throw new Error('Streaming integrity violation: invalid or out-of-bounds totalSize.');
+    }
+
+    if (
+      typeof parsed['chunkSize'] !== 'number' ||
+      !Number.isInteger(parsed['chunkSize']) ||
+      parsed['chunkSize'] <= 0 ||
+      parsed['chunkSize'] > MAX_CHUNK_SIZE
+    ) {
+      throw new Error('Streaming integrity violation: invalid or out-of-bounds chunkSize.');
+    }
+
+    if (!Array.isArray(parsed['chunks']) || parsed['chunks'].length !== parsed['totalChunks']) {
+      throw new Error(
+        `Streaming integrity violation: chunks array length (${Array.isArray(parsed['chunks']) ? parsed['chunks'].length : 'not an array'}) does not match totalChunks (${parsed['totalChunks']}).`
+      );
     }
 
     const decryptedSlices: Uint8Array[] = [];
     for (let idx = 0; idx < parsed['chunks'].length; idx++) {
       const chunkCiphertext = parsed['chunks'][idx];
-      if (typeof chunkCiphertext !== 'string') {
+      if (typeof chunkCiphertext !== 'string' || chunkCiphertext.length === 0) {
         throw new Error(`Streaming integrity violation: chunk ${idx} is not a valid ciphertext string.`);
       }
 
@@ -141,17 +182,34 @@ export class CryptService {
       // Authenticate frame metadata: streamId, chunk index, chunk count, totalSize, chunkSize
       if (
         !frame ||
+        typeof frame !== 'object' ||
+        Array.isArray(frame) ||
+        typeof frame['s'] !== 'string' ||
         frame['s'] !== parsed['streamId'] ||
+        typeof frame['i'] !== 'number' ||
         frame['i'] !== idx ||
+        typeof frame['n'] !== 'number' ||
         frame['n'] !== parsed['totalChunks'] ||
-        (typeof frame['t'] === 'number' && frame['t'] !== parsed['totalSize']) ||
-        (typeof frame['c'] === 'number' && frame['c'] !== parsed['chunkSize'])
+        typeof frame['t'] !== 'number' ||
+        frame['t'] !== parsed['totalSize'] ||
+        typeof frame['c'] !== 'number' ||
+        frame['c'] !== parsed['chunkSize'] ||
+        typeof frame['d'] !== 'string'
       ) {
         throw new Error(`Streaming integrity violation: chunk ${idx} failed authentication (metadata tampering detected).`);
       }
 
+      if (
+        typeof frame['l'] !== 'number' ||
+        !Number.isInteger(frame['l']) ||
+        frame['l'] < 0 ||
+        frame['l'] > parsed['chunkSize']
+      ) {
+        throw new Error(`Streaming integrity violation: chunk ${idx} frame length is invalid or exceeds chunkSize.`);
+      }
+
       const binaryStr = atob(frame['d'] as string);
-      if (typeof frame['l'] === 'number' && binaryStr.length !== frame['l']) {
+      if (binaryStr.length !== frame['l']) {
         throw new Error(`Streaming integrity violation: chunk ${idx} length mismatch.`);
       }
 
