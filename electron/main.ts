@@ -27,6 +27,111 @@ if (squirrelStartup) {
 app.setName('Darkstar Vault');
 app.setAppUserModelId('com.squirrel.darkstar-vault.Darkstar');
 
+/**
+ * Automatic one-time migration from legacy storage directory (%APPDATA%/Darkstar -> %APPDATA%/Darkstar Vault).
+ * Preserves Chromium Local Storage (vault payload), Local State (DPAPI keys for safeStorage),
+ * WebAuthn FIDO2 credentials, and secure vault attachments.
+ */
+function migrateLegacyUserData(): void {
+  try {
+    const currentUserData = app.getPath('userData');
+    const appData = app.getPath('appData');
+
+    const legacyCandidates = [
+      path.join(appData, 'Darkstar'),
+      path.join(appData, 'darkstar'),
+    ];
+
+    let legacyDir: string | null = null;
+    for (const candidate of legacyCandidates) {
+      if (
+        fsSync.existsSync(candidate) &&
+        path.resolve(candidate).toLowerCase() !== path.resolve(currentUserData).toLowerCase()
+      ) {
+        legacyDir = candidate;
+        break;
+      }
+    }
+
+    if (!legacyDir) return;
+
+    const migrationMarker = path.join(currentUserData, '.legacy_migration_done');
+    if (fsSync.existsSync(migrationMarker)) {
+      return;
+    }
+
+    const hasLocalStorage = fsSync.existsSync(path.join(legacyDir, 'Local Storage'));
+    const hasWebAuthn = fsSync.existsSync(path.join(legacyDir, 'webauthn_registry.json'));
+    const hasVaultStorage = fsSync.existsSync(path.join(legacyDir, 'vault_storage'));
+    const hasLocalState = fsSync.existsSync(path.join(legacyDir, 'Local State'));
+
+    if (!hasLocalStorage && !hasWebAuthn && !hasVaultStorage && !hasLocalState) {
+      return;
+    }
+
+    if (!fsSync.existsSync(currentUserData)) {
+      fsSync.mkdirSync(currentUserData, { recursive: true, mode: 0o700 });
+    }
+
+    const itemsToMigrate = ['Local State', 'Local Storage', 'webauthn_registry.json', 'vault_storage', 'Preferences'];
+    const backupDir = path.join(currentUserData, '.pre_migration_backup');
+
+    // Create safe backup of any existing files in destination before copying
+    for (const item of itemsToMigrate) {
+      const targetItem = path.join(currentUserData, item);
+      if (fsSync.existsSync(targetItem)) {
+        if (!fsSync.existsSync(backupDir)) {
+          fsSync.mkdirSync(backupDir, { recursive: true });
+        }
+        try {
+          fsSync.cpSync(targetItem, path.join(backupDir, item), { recursive: true, force: true });
+        } catch {
+          /* best-effort backup */
+        }
+      }
+    }
+
+    // Copy legacy items into currentUserData
+    for (const item of itemsToMigrate) {
+      const srcItem = path.join(legacyDir, item);
+      const dstItem = path.join(currentUserData, item);
+      if (fsSync.existsSync(srcItem)) {
+        fsSync.cpSync(srcItem, dstItem, { recursive: true, force: true });
+      }
+    }
+
+    // Clear stale leveldb LOCK file if present
+    const lockFile = path.join(currentUserData, 'Local Storage', 'leveldb', 'LOCK');
+    if (fsSync.existsSync(lockFile)) {
+      try {
+        fsSync.unlinkSync(lockFile);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    fsSync.writeFileSync(
+      migrationMarker,
+      JSON.stringify(
+        {
+          migratedAt: new Date().toISOString(),
+          source: legacyDir,
+          version: '3.0.6',
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    console.log(`[Storage Migration] Successfully migrated legacy vault storage from ${legacyDir} to ${currentUserData}`);
+  } catch (err) {
+    console.error('[Storage Migration] Error during legacy storage migration:', err);
+  }
+}
+
+migrateLegacyUserData();
+
+
 // Suppress known GPU and disk cache "Access Denied" errors on rapid restarts (especially in dev mode)
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-http-cache');
